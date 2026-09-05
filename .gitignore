@@ -1,0 +1,18 @@
+# Build output
+build/
+build-*/
+cmake-build-*/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+
+# Misc
+*.log
+compile_commands.json

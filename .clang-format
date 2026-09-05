@@ -1,0 +1,24 @@
+---
+# JUCE-flavoured style: Allman braces, 4 spaces, no tabs.
+Language:        Cpp
+BasedOnStyle:    LLVM
+AccessModifierOffset: -4
+AlignAfterOpenBracket: Align
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Allman
+BreakConstructorInitializers: BeforeComma
+ColumnLimit:     120
+ConstructorInitializerIndentWidth: 4
+Cpp11BracedListStyle: false
+IndentWidth:     4
+NamespaceIndentation: All
+PointerAlignment: Left
+SortIncludes:    false
+SpaceAfterTemplateKeyword: false
+SpacesBeforeTrailingComments: 1
+Standard:        c++20
+TabWidth:        4
+UseTab:          Never
