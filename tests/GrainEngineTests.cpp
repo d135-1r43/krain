@@ -3,11 +3,15 @@
 
 #include "dsp/DelayBuffer.h"
 #include "dsp/GrainEngine.h"
+#include "WavWriter.h"
 
 #include <atomic>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 #include <new>
+#include <string>
+#include <vector>
 
 //==============================================================================
 // Allocation counter
@@ -102,12 +106,47 @@ struct RenderResult
     int allocations = 0;
 };
 
+/** Writes a source/processed pair plus a JSON sidecar into the renders directory.
+
+    This is the bit that turns a green test into something you can actually listen
+    to. A passing assertion tells you the output is finite; only your ears tell you
+    the grains are not clicking.
+*/
+void capture (const std::string& id,
+              const std::string& title,
+              const std::vector<std::vector<float>>& source,
+              const std::vector<std::vector<float>>& processed)
+{
+    const std::string directory = GRAINDELAY_RENDER_DIR;
+
+    std::error_code errorCode;
+    std::filesystem::create_directories (directory, errorCode);
+
+    const auto numSamples = (int) source[0].size();
+    const float* sourcePointers[2] { source[0].data(), source[1].data() };
+    const float* processedPointers[2] { processed[0].data(), processed[1].data() };
+
+    graindelay::wav::writeFloat32 (directory + "/" + id + "--source.wav", sourcePointers, 2, numSamples, testSampleRate);
+    graindelay::wav::writeFloat32 (directory + "/" + id + "--processed.wav", processedPointers, 2, numSamples, testSampleRate);
+
+    graindelay::wav::writeSidecar (directory + "/" + id + ".json",
+                                   "{\n  \"preset\": \"" + id + "\",\n"
+                                   "  \"presetDescription\": \"" + title + "\",\n"
+                                   "  \"source\": \"test\",\n"
+                                   "  \"sourceDescription\": \"Written by the Catch2 suite\",\n"
+                                   "  \"origin\": \"test\"\n}\n");
+}
+
 /** Feeds `input` (a callback producing one sample) through the engine.
 
     The impulse / noise-burst / silence cases below are all just different callbacks.
 */
 template <typename SampleProvider>
-RenderResult render (graindelay::GrainEngine& engine, double seconds, SampleProvider&& provider)
+RenderResult render (graindelay::GrainEngine& engine,
+                     double seconds,
+                     SampleProvider&& provider,
+                     const std::string& captureId = {},
+                     const std::string& captureTitle = {})
 {
     const auto totalSamples = (int) (seconds * testSampleRate);
     const auto numBlocks = juce::jmax (1, totalSamples / testBlockSize);
@@ -117,6 +156,21 @@ RenderResult render (graindelay::GrainEngine& engine, double seconds, SampleProv
     RenderResult result;
     double sumOfSquares = 0.0;
     int sampleIndex = 0;
+
+    const auto capturing = ! captureId.empty();
+    std::vector<std::vector<float>> capturedSource, capturedProcessed;
+
+    if (capturing)
+    {
+        capturedSource.assign (2, {});
+        capturedProcessed.assign (2, {});
+
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            capturedSource[(size_t) ch].reserve ((size_t) (numBlocks * testBlockSize));
+            capturedProcessed[(size_t) ch].reserve ((size_t) (numBlocks * testBlockSize));
+        }
+    }
 
     for (int block = 0; block < numBlocks; ++block)
     {
@@ -128,12 +182,24 @@ RenderResult render (graindelay::GrainEngine& engine, double seconds, SampleProv
                 buffer.setSample (ch, n, value);
         }
 
+        if (capturing)
+            for (int ch = 0; ch < 2; ++ch)
+                capturedSource[(size_t) ch].insert (capturedSource[(size_t) ch].end(),
+                                                    buffer.getReadPointer (ch),
+                                                    buffer.getReadPointer (ch) + testBlockSize);
+
         {
             // Everything inside this scope runs on what would be the audio thread.
             const AllocationGuard guard;
             engine.process (buffer);
             result.allocations += guard.count();
         }
+
+        if (capturing)
+            for (int ch = 0; ch < 2; ++ch)
+                capturedProcessed[(size_t) ch].insert (capturedProcessed[(size_t) ch].end(),
+                                                       buffer.getReadPointer (ch),
+                                                       buffer.getReadPointer (ch) + testBlockSize);
 
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
@@ -151,6 +217,9 @@ RenderResult render (graindelay::GrainEngine& engine, double seconds, SampleProv
     }
 
     result.rms = std::sqrt (sumOfSquares / juce::jmax (1.0, (double) numBlocks * testBlockSize * 2.0));
+
+    if (capturing)
+        capture (captureId, captureTitle, capturedSource, capturedProcessed);
 
     return result;
 }
@@ -229,7 +298,8 @@ TEST_CASE ("GrainEngine renders an impulse without NaN or Inf", "[grainengine]")
     engine.prepare (testSampleRate, 2);
     engine.setParameters (defaultParameters());
 
-    const auto result = render (engine, 5.0, [] (int index) { return index == 0 ? 1.0f : 0.0f; });
+    const auto result = render (engine, 5.0, [] (int index) { return index == 0 ? 1.0f : 0.0f; },
+                                "test-impulse", "Single impulse, default parameters");
 
     REQUIRE (result.allFinite);
     REQUIRE (result.peak > 0.0f);        // the impulse actually came back out
@@ -268,7 +338,8 @@ TEST_CASE ("GrainEngine survives 30 s at feedback 0.95", "[grainengine][stabilit
     const auto result = render (engine, 30.0, [&random] (int index)
     {
         return index < (int) testSampleRate ? random.nextFloat() * 2.0f - 1.0f : 0.0f;
-    });
+    },
+    "test-feedback-095", "Noise burst then 29 s of tail at feedback 0.95");
 
     REQUIRE (result.allFinite);
 
@@ -292,7 +363,8 @@ TEST_CASE ("GrainEngine decays once the input stops", "[grainengine][stability]"
     render (engine, 4.0, burst);
 
     // ...then keep going with silence and check the tail has actually died away.
-    const auto tail = render (engine, 20.0, [] (int) { return 0.0f; });
+    const auto tail = render (engine, 20.0, [] (int) { return 0.0f; },
+                              "test-decay", "Tail after the input stops, feedback 0.5");
 
     REQUIRE (tail.allFinite);
     REQUIRE (tail.peak < 0.05f);
@@ -313,7 +385,8 @@ TEST_CASE ("Freeze keeps the texture going after the input stops", "[grainengine
     parameters.freeze = true;
     engine.setParameters (parameters);
 
-    const auto frozen = render (engine, 5.0, [] (int) { return 0.0f; });
+    const auto frozen = render (engine, 5.0, [] (int) { return 0.0f; },
+                                "test-freeze", "Freeze engaged, input silent");
 
     REQUIRE (frozen.allFinite);
     REQUIRE (frozen.rms > 0.001);
@@ -339,7 +412,8 @@ TEST_CASE ("Extreme parameter settings stay finite", "[grainengine]")
     engine.setParameters (parameters);
 
     juce::Random random (0xBEEF);
-    const auto result = render (engine, 10.0, [&random] (int) { return random.nextFloat() * 2.0f - 1.0f; });
+    const auto result = render (engine, 10.0, [&random] (int) { return random.nextFloat() * 2.0f - 1.0f; },
+                                "test-extremes-max", "Every parameter at its maximum");
 
     REQUIRE (result.allFinite);
     REQUIRE (result.peak < 10.0f);

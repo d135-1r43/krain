@@ -32,6 +32,9 @@ build/GrainDelay_artefacts/Release/
 cd build && ctest --output-on-failure
 ```
 
+The tests do not only assert - they also leave a listenable source/processed pair
+for each interesting case in `build/renders/`. See **Listening to changes** below.
+
 ### Useful options
 
 | Option | Default | Meaning |
@@ -87,6 +90,52 @@ exact compile flags. The `GrainDelay_Standalone` target is directly runnable.
                                                      output
 ```
 
+## Listening to changes
+
+A green test tells you the output is finite. It cannot tell you the grains stopped
+clicking, or that the new window shape made the tail muddy. So both the test suite
+and a dedicated renderer write WAV pairs into `build/renders/`, and a small local
+web app plays them back A/B.
+
+```bash
+cmake --build build --target graindelay-render
+./build/tools/graindelay-render --source clicks    # writes six preset renders
+tools/compare/serve.sh                             # indexes them and opens the app
+```
+
+`graindelay-render --list` shows the built-in test signals (impulse, click train,
+detuned chord, noise burst, sine sweep) and the presets. `--input yourfile.wav`
+renders your own material instead.
+
+The compare app (`tools/compare/index.html`) plays **both signals at once** and
+crossfades between them, so A/B switching is gapless and you are comparing the same
+instant rather than two different playthroughs:
+
+| Key | |
+| --- | --- |
+| `Space` | play / pause |
+| `A` `B` | pick a side, `X` flips |
+| `L` | loop |
+| `M` | match level — scales the processed signal to the source's RMS, because louder always sounds better and level bias makes A/B worthless |
+| `↑` `↓` | previous / next render |
+
+It shows peak and RMS in dBFS for both, the RMS delta, a live overlaid spectrum,
+and marks anything past 0 dBFS in red — the feedback path can legitimately exceed
+full scale, and it is useful to see exactly where.
+
+The app also accepts dragged-and-dropped WAV pairs named
+`<id>--source.wav` / `<id>--processed.wav`, so it works without the server too.
+
+### Why pairing happens in Python
+
+Each producer writes its own WAVs plus a JSON sidecar;
+`tools/compare/build_manifest.py` scans the directory and pairs them. Catch2 runs
+its cases in parallel processes, so no producer can safely own a shared index file.
+The scanner also reads the sample rate out of the WAV header, because the browser's
+`decodeAudioData` resamples to the AudioContext rate and loses it.
+
+---
+
 ### Source layout
 
 ```
@@ -103,6 +152,13 @@ Source/
                               ParameterSlider / Toggle / Choice / Group
 tests/
 └── GrainEngineTests.cpp      Catch2 suite (offline rendering)
+tools/
+├── WavWriter.h               dependency-free float32 WAV writer
+├── render/RenderMain.cpp     offline renderer: signals x presets -> WAV pairs
+└── compare/
+    ├── index.html            the A/B compare app
+    ├── build_manifest.py     pairs WAVs into manifest.json
+    └── serve.sh              index + serve + open
 ```
 
 `Source/dsp/` is compiled into a separate static library, `GrainDelayDsp`, which

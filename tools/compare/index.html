@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grain A/B</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;450;600&display=swap">
+<style>
+:root {
+  --ground:      #eef0f4;
+  --surface:     #ffffff;
+  --surface-sunk:#e4e7ed;
+  --line:        #d3d8e0;
+  --line-strong: #b4bcc8;
+  --text:        #171b21;
+  --text-dim:    #5d6773;
+  --text-faint:  #8d96a3;
+  --source:      #2f6ea8;
+  --source-soft: #2f6ea82e;
+  --processed:   #b56411;
+  --processed-soft:#b564112e;
+  --hot:         #b03030;
+  --focus:       #2f6ea8;
+
+  --step-0: 0.6875rem;
+  --step-1: 0.8125rem;
+  --step-2: 0.9375rem;
+  --step-3: 1.25rem;
+  --step-4: 1.75rem;
+
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+:root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    --ground:      #14171c;
+    --surface:     #1a1e25;
+    --surface-sunk:#0f1216;
+    --line:        #272d36;
+    --line-strong: #3a424e;
+    --text:        #dde2e9;
+    --text-dim:    #8f99a6;
+    --text-faint:  #656f7c;
+    --source:      #5b9dd9;
+    --source-soft: #5b9dd92e;
+    --processed:   #e0913f;
+    --processed-soft:#e0913f2e;
+    --hot:         #d94f4f;
+    --focus:       #5b9dd9;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14171c;
+  --surface:     #1a1e25;
+  --surface-sunk:#0f1216;
+  --line:        #272d36;
+  --line-strong: #3a424e;
+  --text:        #dde2e9;
+  --text-dim:    #8f99a6;
+  --text-faint:  #656f7c;
+  --source:      #5b9dd9;
+  --source-soft: #5b9dd92e;
+  --processed:   #e0913f;
+  --processed-soft:#e0913f2e;
+  --hot:         #d94f4f;
+  --focus:       #5b9dd9;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: var(--step-2);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font: inherit; color: inherit; }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.label {
+  font-family: var(--cond);
+  font-size: var(--step-0);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- topbar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 18px;
+  height: 52px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.brand {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: var(--step-3);
+  letter-spacing: 0.02em;
+}
+.brand span { color: var(--text-faint); font-weight: 500; }
+
+.topbar .spacer { flex: 1; }
+
+.meta-pair { display: flex; align-items: baseline; gap: 7px; }
+.meta-pair .value { font-family: var(--mono); font-size: var(--step-1); color: var(--text-dim); }
+
+.icon-button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px 11px;
+  font-family: var(--cond);
+  font-size: var(--step-0);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.icon-button:hover { border-color: var(--line-strong); color: var(--text); }
+
+/* ------------------------------------------------------------------ shell */
+.shell {
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+  height: calc(100% - 52px);
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; height: auto; }
+  .rail { max-height: 260px; }
+}
+
+/* ------------------------------------------------------------------- rail */
+.rail {
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  overflow-y: auto;
+  padding: 14px 0 24px;
+}
+
+.rail-group { padding: 0 14px; }
+.rail-group + .rail-group { margin-top: 20px; }
+.rail-group > .label { display: block; margin-bottom: 8px; }
+
+.rail-list { display: flex; flex-direction: column; gap: 2px; }
+
+.rail-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 4px 4px 0;
+  padding: 7px 10px;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+.rail-item:hover { background: var(--surface-sunk); color: var(--text); }
+.rail-item[aria-current="true"] {
+  background: var(--surface-sunk);
+  border-left-color: var(--processed);
+  color: var(--text);
+}
+.rail-item .name { font-weight: 450; font-size: var(--step-1); display: block; }
+.rail-item .sub {
+  font-family: var(--mono);
+  font-size: var(--step-0);
+  color: var(--text-faint);
+  display: block;
+}
+
+/* ------------------------------------------------------------------ stage */
+.stage { overflow-y: auto; padding: 20px 22px 40px; display: flex; flex-direction: column; gap: 18px; }
+
+.stage-head { display: flex; flex-direction: column; gap: 10px; }
+.stage-title { font-size: var(--step-4); font-family: var(--cond); font-weight: 600; margin: 0; text-wrap: balance; }
+.stage-note { margin: 0; color: var(--text-dim); font-size: var(--step-1); max-width: 62ch; }
+
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 3px; }
+.chip {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-family: var(--mono);
+  font-size: var(--step-0);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.chip b { font-weight: 600; color: var(--text); }
+
+/* ----------------------------------------------------------------- scopes */
+.scopes { display: flex; flex-direction: column; gap: 8px; }
+
+.scope { position: relative; background: var(--surface-sunk); border: 1px solid var(--line); border-radius: 6px; }
+.scope.is-active { border-color: var(--line-strong); }
+
+.scope-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 11px 5px;
+}
+.swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.scope-head .label { color: var(--text-dim); }
+.scope-head .stats { margin-left: auto; display: flex; gap: 14px; }
+.stat { display: flex; align-items: baseline; gap: 5px; }
+.stat .k { font-family: var(--cond); font-size: var(--step-0); letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-faint); }
+.stat .v { font-family: var(--mono); font-size: var(--step-1); }
+.stat .v.hot { color: var(--hot); }
+
+.scope canvas { display: block; width: 100%; height: 152px; cursor: crosshair; }
+
+/* -------------------------------------------------------------- transport */
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 11px 13px;
+}
+
+.play {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-sunk);
+  cursor: pointer;
+  display: grid; place-items: center;
+  flex: none;
+}
+.play:hover { border-color: var(--text-dim); }
+.play svg { width: 15px; height: 15px; fill: var(--text); }
+
+.ab {
+  display: flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  overflow: hidden;
+  flex: none;
+}
+.ab button {
+  border: 0;
+  background: var(--surface-sunk);
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  transition: background 120ms ease, color 120ms ease;
+}
+.ab button .key {
+  font-family: var(--mono);
+  font-size: var(--step-0);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  color: var(--text-faint);
+}
+.ab button .txt { font-family: var(--cond); font-size: var(--step-1); letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; }
+.ab button[aria-pressed="true"] { color: #fff; }
+.ab button[data-side="a"][aria-pressed="true"] { background: var(--source); }
+.ab button[data-side="b"][aria-pressed="true"] { background: var(--processed); }
+.ab button[aria-pressed="true"] .key { border-color: #ffffff59; color: #ffffffcc; }
+
+.time { font-family: var(--mono); font-size: var(--step-1); color: var(--text-dim); flex: none; }
+.time .now { color: var(--text); }
+
+.toggles { display: flex; gap: 7px; margin-left: auto; }
+.toggle {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 5px;
+  padding: 6px 11px;
+  cursor: pointer;
+  font-family: var(--cond);
+  font-size: var(--step-0);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.toggle[aria-pressed="true"] { border-color: var(--line-strong); color: var(--text); background: var(--surface-sunk); }
+
+/* ---------------------------------------------------------------- spectra */
+.analysis { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 14px; }
+@media (max-width: 700px) { .analysis { grid-template-columns: 1fr; } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 11px 13px; }
+.panel > .label { display: block; margin-bottom: 9px; }
+.panel canvas { display: block; width: 100%; height: 168px; }
+
+.keys { display: flex; flex-direction: column; gap: 5px; }
+.keys div { display: flex; align-items: baseline; gap: 9px; font-size: var(--step-1); color: var(--text-dim); }
+.keys kbd {
+  font-family: var(--mono);
+  font-size: var(--step-0);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--text);
+  min-width: 34px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ empty */
+.empty { display: grid; place-items: center; padding: 56px 20px; }
+.empty-inner { max-width: 54ch; text-align: center; display: flex; flex-direction: column; gap: 12px; }
+.empty h2 { font-family: var(--cond); font-size: var(--step-3); margin: 0; }
+.empty p { margin: 0; color: var(--text-dim); font-size: var(--step-1); }
+.empty pre {
+  margin: 4px 0 0;
+  text-align: left;
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 11px 13px;
+  font-family: var(--mono);
+  font-size: var(--step-1);
+  overflow-x: auto;
+  color: var(--text-dim);
+}
+body.dragging .empty-inner { outline: 2px dashed var(--processed); outline-offset: 18px; }
+
+[hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Grain<span>A/B</span></div>
+  <div class="meta-pair"><span class="label">Rate</span><span class="value" id="metaRate">—</span></div>
+  <div class="meta-pair"><span class="label">Renders</span><span class="value" id="metaCount">—</span></div>
+  <div class="spacer"></div>
+  <button class="icon-button" id="themeButton" type="button">Theme</button>
+</header>
+
+<div class="shell">
+  <aside class="rail" id="rail"></aside>
+
+  <main class="stage">
+    <div class="empty" id="empty">
+      <div class="empty-inner">
+        <h2>No renders found</h2>
+        <p>Render a batch, then reload. Or drop a pair of WAV files named
+           <code>&lt;id&gt;--source.wav</code> and <code>&lt;id&gt;--processed.wav</code> anywhere on this page.</p>
+        <pre>cmake --build build --target graindelay-render
+./build/tools/graindelay-render --source clicks
+tools/compare/serve.sh</pre>
+      </div>
+    </div>
+
+    <div id="workspace" hidden>
+      <div class="stage-head">
+        <h1 class="stage-title" id="title">—</h1>
+        <p class="stage-note" id="note"></p>
+        <div class="chips" id="chips"></div>
+      </div>
+
+      <section class="scopes" style="margin-top:18px">
+        <figure class="scope" id="scopeA" style="margin:0">
+          <div class="scope-head">
+            <span class="swatch" style="background:var(--source)"></span>
+            <span class="label">A · Source</span>
+            <div class="stats">
+              <span class="stat"><span class="k">Peak</span><span class="v num" id="peakA">—</span></span>
+              <span class="stat"><span class="k">RMS</span><span class="v num" id="rmsA">—</span></span>
+            </div>
+          </div>
+          <canvas id="waveA"></canvas>
+        </figure>
+
+        <figure class="scope" id="scopeB" style="margin:0">
+          <div class="scope-head">
+            <span class="swatch" style="background:var(--processed)"></span>
+            <span class="label">B · Processed</span>
+            <div class="stats">
+              <span class="stat"><span class="k">Peak</span><span class="v num" id="peakB">—</span></span>
+              <span class="stat"><span class="k">RMS</span><span class="v num" id="rmsB">—</span></span>
+              <span class="stat"><span class="k">Δ RMS</span><span class="v num" id="deltaRms">—</span></span>
+            </div>
+          </div>
+          <canvas id="waveB"></canvas>
+        </figure>
+      </section>
+
+      <section class="transport" style="margin-top:14px">
+        <button class="play" id="playButton" type="button" aria-label="Play">
+          <svg id="playIcon" viewBox="0 0 16 16"><path d="M3 1.5v13l11-6.5z"/></svg>
+        </button>
+
+        <div class="ab">
+          <button type="button" data-side="a" aria-pressed="true"><span class="key">A</span><span class="txt">Source</span></button>
+          <button type="button" data-side="b" aria-pressed="false"><span class="key">B</span><span class="txt">Processed</span></button>
+        </div>
+
+        <div class="time"><span class="now" id="timeNow">0.00</span> / <span id="timeTotal">0.00</span> s</div>
+
+        <div class="toggles">
+          <button class="toggle" id="loopButton" type="button" aria-pressed="true">Loop</button>
+          <button class="toggle" id="matchButton" type="button" aria-pressed="false">Match&nbsp;level</button>
+        </div>
+      </section>
+
+      <section class="analysis" style="margin-top:14px">
+        <div class="panel">
+          <span class="label">Spectrum · both signals, live</span>
+          <canvas id="spectrum"></canvas>
+        </div>
+        <div class="panel">
+          <span class="label">Keys</span>
+          <div class="keys">
+            <div><kbd>Space</kbd> play / pause</div>
+            <div><kbd>A</kbd> <kbd>B</kbd> pick side</div>
+            <div><kbd>X</kbd> flip A ↔ B</div>
+            <div><kbd>L</kbd> loop</div>
+            <div><kbd>M</kbd> match level</div>
+            <div><kbd>↑ ↓</kbd> previous / next</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------- state
+const state = {
+  items: [],
+  current: null,
+  buffers: { a: null, b: null },
+  side: "a",
+  loop: true,
+  match: false,
+  playing: false,
+  offset: 0,
+  startedAt: 0,
+  matchGain: 1,
+};
+
+let audio = null;      // AudioContext, created on first user gesture
+const nodes = { a: null, b: null, gainA: null, gainB: null, anaA: null, anaB: null };
+
+const $ = (id) => document.getElementById(id);
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// ---------------------------------------------------------------- theme
+const themeButton = $("themeButton");
+const storedTheme = (() => { try { return localStorage.getItem("grainab-theme"); } catch { return null; } })();
+if (storedTheme) document.documentElement.setAttribute("data-theme", storedTheme);
+
+themeButton.addEventListener("click", () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const now = document.documentElement.getAttribute("data-theme") || (dark ? "dark" : "light");
+  const next = now === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  try { localStorage.setItem("grainab-theme", next); } catch { /* private mode */ }
+  redrawAll();
+});
+
+// ---------------------------------------------------------- analysis maths
+function analyse(buffer) {
+  let peak = 0, sumSquares = 0, count = 0;
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const data = buffer.getChannelData(ch);
+    for (let i = 0; i < data.length; i++) {
+      const v = Math.abs(data[i]);
+      if (v > peak) peak = v;
+      sumSquares += data[i] * data[i];
+      count++;
+    }
+  }
+  return { peak, rms: Math.sqrt(sumSquares / Math.max(1, count)) };
+}
+
+const toDb = (v) => (v <= 1e-7 ? -Infinity : 20 * Math.log10(v));
+const fmtDb = (v) => (Number.isFinite(v) ? (v >= 0 ? "+" : "") + v.toFixed(1) : "−∞");
+
+/** Peak envelope per pixel column, computed once per buffer and cached. */
+function envelope(buffer, columns) {
+  const channels = [];
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) channels.push(buffer.getChannelData(ch));
+  const step = buffer.length / columns;
+  const out = new Float32Array(columns * 2);
+
+  for (let x = 0; x < columns; x++) {
+    const from = Math.floor(x * step);
+    const to = Math.min(buffer.length, Math.floor((x + 1) * step));
+    let min = 0, max = 0;
+    for (const data of channels) {
+      for (let i = from; i < to; i++) {
+        const v = data[i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+    out[x * 2] = min;
+    out[x * 2 + 1] = max;
+  }
+  return out;
+}
+
+// ------------------------------------------------------------- waveforms
+const waveCache = new WeakMap();
+
+function sizeCanvas(canvas) {
+  const ratio = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.round(rect.width * ratio));
+  canvas.height = Math.max(1, Math.round(rect.height * ratio));
+  const context = canvas.getContext("2d");
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  return { context, width: rect.width, height: rect.height };
+}
+
+function drawWave(canvas, buffer, colour, softColour) {
+  const { context, width, height } = sizeCanvas(canvas);
+  context.clearRect(0, 0, width, height);
+  if (!buffer) return;
+
+  const mid = height / 2;
+  // Full scale is 1.0, but this plug-in can legitimately exceed it, so the scope
+  // shows a little headroom and marks the 0 dBFS lines explicitly.
+  const headroom = 1.35;
+  const scale = mid / headroom;
+
+  const columns = Math.max(1, Math.floor(width));
+  let peaks = waveCache.get(buffer);
+  if (!peaks || peaks.columns !== columns) {
+    peaks = { columns, data: envelope(buffer, columns) };
+    waveCache.set(buffer, peaks);
+  }
+
+  // 0 dBFS guides — anything reaching these is at full scale.
+  context.strokeStyle = css("--line");
+  context.lineWidth = 1;
+  context.setLineDash([2, 4]);
+  context.beginPath();
+  context.moveTo(0, mid - scale); context.lineTo(width, mid - scale);
+  context.moveTo(0, mid + scale); context.lineTo(width, mid + scale);
+  context.stroke();
+  context.setLineDash([]);
+
+  context.strokeStyle = css("--line-strong");
+  context.beginPath();
+  context.moveTo(0, mid); context.lineTo(width, mid);
+  context.stroke();
+
+  context.fillStyle = colour;
+  for (let x = 0; x < columns; x++) {
+    const min = peaks.data[x * 2], max = peaks.data[x * 2 + 1];
+    const top = mid - max * scale;
+    const bottom = mid - min * scale;
+    const clipped = max > 1 || min < -1;
+    if (clipped) context.fillStyle = css("--hot");
+    context.fillRect(x, top, 1, Math.max(1, bottom - top));
+    if (clipped) context.fillStyle = colour;
+  }
+
+  // playhead
+  if (state.current && buffer.duration > 0) {
+    const x = (position() / buffer.duration) * width;
+    context.fillStyle = softColour;
+    context.fillRect(0, 0, x, height);
+    context.strokeStyle = css("--text");
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(Math.round(x) + 0.5, 0);
+    context.lineTo(Math.round(x) + 0.5, height);
+    context.stroke();
+  }
+}
+
+function drawSpectrum() {
+  const canvas = $("spectrum");
+  const { context, width, height } = sizeCanvas(canvas);
+  context.clearRect(0, 0, width, height);
+
+  context.strokeStyle = css("--line");
+  context.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    const y = (height / 4) * i;
+    context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke();
+  }
+
+  if (!nodes.anaA) return;
+
+  const draw = (analyser, colour, emphasis) => {
+    const bins = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(bins);
+    context.strokeStyle = colour;
+    context.lineWidth = emphasis ? 1.75 : 1;
+    context.globalAlpha = emphasis ? 1 : 0.45;
+    context.beginPath();
+    // Log frequency axis: linear bins waste 90% of the width on the top octave.
+    const nyquist = audio.sampleRate / 2;
+    for (let x = 0; x < width; x++) {
+      const hz = 20 * Math.pow(nyquist / 20, x / width);
+      const bin = Math.min(bins.length - 1, Math.round((hz / nyquist) * bins.length));
+      const y = height - (bins[bin] / 255) * height;
+      x === 0 ? context.moveTo(x, y) : context.lineTo(x, y);
+    }
+    context.stroke();
+    context.globalAlpha = 1;
+  };
+
+  draw(nodes.anaA, css("--source"), state.side === "a");
+  draw(nodes.anaB, css("--processed"), state.side === "b");
+}
+
+function redrawAll() {
+  drawWave($("waveA"), state.buffers.a, css("--source"), css("--source-soft"));
+  drawWave($("waveB"), state.buffers.b, css("--processed"), css("--processed-soft"));
+  drawSpectrum();
+}
+
+// ------------------------------------------------------------- transport
+function position() {
+  if (!state.buffers.a) return 0;
+  const duration = state.buffers.a.duration;
+  if (!state.playing) return Math.min(state.offset, duration);
+  const elapsed = state.offset + (audio.currentTime - state.startedAt);
+  return state.loop ? elapsed % duration : Math.min(elapsed, duration);
+}
+
+function ensureAudio() {
+  if (audio) return;
+  audio = new (window.AudioContext || window.webkitAudioContext)();
+  for (const side of ["a", "b"]) {
+    const gain = audio.createGain();
+    const analyser = audio.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.75;
+    gain.connect(analyser);
+    analyser.connect(audio.destination);
+    nodes["gain" + side.toUpperCase()] = gain;
+    nodes["ana" + side.toUpperCase()] = analyser;
+  }
+  applyGains(0);
+}
+
+/** Both signals always run; A/B is a gain crossfade, so switching is gapless and
+    you compare the same instant rather than two different playthroughs. */
+function applyGains(rampSeconds = 0.008) {
+  if (!audio) return;
+  const now = audio.currentTime;
+  const bGain = state.match ? state.matchGain : 1;
+  for (const [side, gain, target] of [["a", nodes.gainA, state.side === "a" ? 1 : 0],
+                                      ["b", nodes.gainB, state.side === "b" ? bGain : 0]]) {
+    void side;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(target, now + rampSeconds);
+  }
+}
+
+function stopSources() {
+  for (const side of ["a", "b"]) {
+    if (nodes[side]) { try { nodes[side].stop(); } catch { /* already stopped */ } nodes[side].disconnect(); nodes[side] = null; }
+  }
+}
+
+function startSources(offset) {
+  stopSources();
+  ensureAudio();
+  for (const [side, gain] of [["a", nodes.gainA], ["b", nodes.gainB]]) {
+    const source = audio.createBufferSource();
+    source.buffer = state.buffers[side];
+    source.loop = state.loop;
+    source.connect(gain);
+    source.start(0, offset % state.buffers[side].duration);
+    nodes[side] = source;
+  }
+  state.offset = offset;
+  state.startedAt = audio.currentTime;
+  state.playing = true;
+  applyGains(0);
+  setPlayIcon(true);
+}
+
+function play() {
+  if (!state.buffers.a) return;
+  ensureAudio();
+  if (audio.state === "suspended") audio.resume();
+  startSources(state.offset);
+}
+
+function pause() {
+  if (!state.playing) return;
+  const at = position();
+  stopSources();
+  state.playing = false;
+  state.offset = at;
+  setPlayIcon(false);
+}
+
+function togglePlay() { state.playing ? pause() : play(); }
+
+function setPlayIcon(playing) {
+  $("playIcon").innerHTML = playing
+    ? '<path d="M3 2h4v12H3zM9 2h4v12H9z"/>'
+    : '<path d="M3 1.5v13l11-6.5z"/>';
+  $("playButton").setAttribute("aria-label", playing ? "Pause" : "Play");
+}
+
+function seek(fraction) {
+  if (!state.buffers.a) return;
+  const target = Math.max(0, Math.min(1, fraction)) * state.buffers.a.duration;
+  if (state.playing) startSources(target);
+  else { state.offset = target; redrawAll(); updateTime(); }
+}
+
+function setSide(side) {
+  state.side = side;
+  for (const button of document.querySelectorAll(".ab button"))
+    button.setAttribute("aria-pressed", String(button.dataset.side === side));
+  $("scopeA").classList.toggle("is-active", side === "a");
+  $("scopeB").classList.toggle("is-active", side === "b");
+  applyGains();
+}
+
+function updateTime() {
+  const duration = state.buffers.a ? state.buffers.a.duration : 0;
+  $("timeNow").textContent = position().toFixed(2);
+  $("timeTotal").textContent = duration.toFixed(2);
+}
+
+// ------------------------------------------------------------------ items
+async function loadItem(item) {
+  state.current = item;
+  pause();
+  state.offset = 0;
+
+  for (const button of document.querySelectorAll(".rail-item"))
+    button.setAttribute("aria-current", String(button.dataset.id === item.id));
+
+  $("title").textContent = item.preset || item.id;
+  $("note").textContent = [item.presetDescription, item.sourceDescription].filter(Boolean).join(" · ");
+
+  const chips = $("chips");
+  chips.innerHTML = "";
+  for (const [key, value] of Object.entries(item.params || {})) {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.innerHTML = key.replace(/([A-Z])/g, " $1").toLowerCase() + " <b></b>";
+    chip.querySelector("b").textContent = String(value);
+    chips.append(chip);
+  }
+  chips.hidden = chips.children.length === 0;
+
+  ensureAudio();
+  const [a, b] = await Promise.all([decode(item.sourceUrl ?? item.source), decode(item.processedUrl ?? item.processed)]);
+  state.buffers = { a, b };
+
+  const statsA = analyse(a), statsB = analyse(b);
+  $("peakA").textContent = fmtDb(toDb(statsA.peak));
+  $("rmsA").textContent = fmtDb(toDb(statsA.rms));
+  $("peakB").textContent = fmtDb(toDb(statsB.peak));
+  $("rmsB").textContent = fmtDb(toDb(statsB.rms));
+  $("peakB").classList.toggle("hot", statsB.peak > 1);
+  $("peakA").classList.toggle("hot", statsA.peak > 1);
+
+  const delta = toDb(statsB.rms) - toDb(statsA.rms);
+  $("deltaRms").textContent = Number.isFinite(delta) ? fmtDb(delta) : "—";
+  // Louder always sounds better, so offer to take level out of the comparison.
+  state.matchGain = statsB.rms > 1e-7 ? Math.min(8, statsA.rms / statsB.rms) : 1;
+
+  // The file's own rate, not audio.sampleRate - decodeAudioData resamples to the
+  // AudioContext rate, so the buffer no longer knows what it was rendered at.
+  $("metaRate").textContent = item.sampleRate
+    ? (item.sampleRate / 1000).toFixed(item.sampleRate % 1000 ? 1 : 0) + " kHz"
+    : Math.round(a.sampleRate) / 1000 + " kHz \u00b7 resampled";
+  redrawAll();
+  updateTime();
+}
+
+async function decode(url) {
+  if (url instanceof ArrayBuffer) return audio.decodeAudioData(url.slice(0));
+  const response = await fetch(url);
+  return audio.decodeAudioData(await response.arrayBuffer());
+}
+
+function buildRail(items) {
+  const rail = $("rail");
+  rail.innerHTML = "";
+  const groups = { render: [], test: [], dropped: [] };
+  for (const item of items) (groups[item.origin] || groups.render).push(item);
+
+  const titles = { render: "Renders", test: "From the test suite", dropped: "Dropped files" };
+  for (const [key, list] of Object.entries(groups)) {
+    if (!list.length) continue;
+    const group = document.createElement("div");
+    group.className = "rail-group";
+    const label = document.createElement("span");
+    label.className = "label";
+    label.textContent = titles[key];
+    group.append(label);
+
+    const container = document.createElement("div");
+    container.className = "rail-list";
+    for (const item of list) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "rail-item";
+      button.dataset.id = item.id;
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = item.preset || item.id;
+      const sub = document.createElement("span");
+      sub.className = "sub";
+      sub.textContent = item.sourceName || "";
+      button.append(name, sub);
+      button.addEventListener("click", () => loadItem(item));
+      container.append(button);
+    }
+    group.append(container);
+    rail.append(group);
+  }
+
+  $("metaCount").textContent = String(items.length);
+  $("empty").hidden = items.length > 0;
+  $("workspace").hidden = items.length === 0;
+}
+
+// ------------------------------------------------------------------- boot
+async function boot() {
+  try {
+    const response = await fetch("manifest.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("no manifest");
+    const manifest = await response.json();
+    state.items = manifest.items || [];
+  } catch {
+    state.items = []; // served from file:// or published standalone - drag and drop still works
+  }
+
+  buildRail(state.items);
+  if (state.items.length) loadItem(state.items[0]);
+}
+
+// ------------------------------------------------------- drag and drop
+document.addEventListener("dragover", (event) => { event.preventDefault(); document.body.classList.add("dragging"); });
+document.addEventListener("dragleave", () => document.body.classList.remove("dragging"));
+document.addEventListener("drop", async (event) => {
+  event.preventDefault();
+  document.body.classList.remove("dragging");
+  ensureAudio();
+
+  const files = [...event.dataTransfer.files].filter((f) => /\.wave?$/i.test(f.name));
+  const pairs = new Map();
+
+  for (const file of files) {
+    const match = file.name.match(/^(.*)--(source|processed)\.wave?$/i);
+    const id = match ? match[1] : file.name.replace(/\.wave?$/i, "");
+    const role = match ? match[2].toLowerCase() : (pairs.has(id) ? "processed" : "source");
+    if (!pairs.has(id)) pairs.set(id, { id, preset: id, origin: "dropped", sourceName: "dropped" });
+    pairs.get(id)[role + "Url"] = await file.arrayBuffer();
+  }
+
+  const dropped = [...pairs.values()].filter((item) => item.sourceUrl && item.processedUrl);
+  if (!dropped.length) return;
+  state.items = [...state.items.filter((i) => i.origin !== "dropped"), ...dropped];
+  buildRail(state.items);
+  loadItem(dropped[0]);
+});
+
+// ------------------------------------------------------------------ wiring
+$("playButton").addEventListener("click", togglePlay);
+for (const button of document.querySelectorAll(".ab button"))
+  button.addEventListener("click", () => setSide(button.dataset.side));
+
+$("loopButton").addEventListener("click", () => {
+  state.loop = !state.loop;
+  $("loopButton").setAttribute("aria-pressed", String(state.loop));
+  if (state.playing) startSources(position());
+});
+
+$("matchButton").addEventListener("click", () => {
+  state.match = !state.match;
+  $("matchButton").setAttribute("aria-pressed", String(state.match));
+  applyGains();
+});
+
+for (const [canvas, id] of [[$("waveA"), "a"], [$("waveB"), "b"]]) {
+  void id;
+  canvas.addEventListener("click", (event) => {
+    const rect = canvas.getBoundingClientRect();
+    seek((event.clientX - rect.left) / rect.width);
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.target.closest("input, textarea")) return;
+  const key = event.key.toLowerCase();
+  if (key === " ") { event.preventDefault(); togglePlay(); }
+  else if (key === "a") setSide("a");
+  else if (key === "b") setSide("b");
+  else if (key === "x") setSide(state.side === "a" ? "b" : "a");
+  else if (key === "l") $("loopButton").click();
+  else if (key === "m") $("matchButton").click();
+  else if (key === "arrowup" || key === "arrowdown") {
+    event.preventDefault();
+    const index = state.items.findIndex((i) => i === state.current);
+    const next = state.items[index + (key === "arrowdown" ? 1 : -1)];
+    if (next) loadItem(next);
+  }
+});
+
+window.addEventListener("resize", redrawAll);
+
+(function frame() {
+  if (state.buffers.a) { redrawAll(); updateTime(); }
+  requestAnimationFrame(frame);
+})();
+
+setSide("a");
+boot();
+</script>
+</body>
+</html>

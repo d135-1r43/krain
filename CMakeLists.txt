@@ -109,6 +109,11 @@ target_link_libraries(GrainDelay
         juce::juce_recommended_warning_flags)
 
 # ---------------------------------------------------------------------------
+# Developer tools: offline renderer + the A/B compare app
+# ---------------------------------------------------------------------------
+add_subdirectory(tools)
+
+# ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 if(GRAINDELAY_BUILD_TESTS)
