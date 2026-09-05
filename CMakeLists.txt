@@ -89,7 +89,8 @@ juce_add_plugin(GrainDelay
 
 target_sources(GrainDelay PRIVATE
     Source/PluginProcessor.cpp
-    Source/PluginEditor.cpp)
+    Source/PluginEditor.cpp
+    Source/gui/ParameterComponents.cpp)
 
 target_compile_definitions(GrainDelay PUBLIC
     JUCE_WEB_BROWSER=0
