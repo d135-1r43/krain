@@ -24,6 +24,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+option(GRAINDELAY_BUILD_TESTS "Build the Catch2 unit tests" ON)
 option(GRAINDELAY_COPY_PLUGIN_AFTER_BUILD "Install the built plug-ins into the user plug-in folders" OFF)
 
 # Warning flags applied only to *our* targets - JUCE's own sources are compiled
@@ -106,3 +107,11 @@ target_link_libraries(GrainDelay
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+if(GRAINDELAY_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
