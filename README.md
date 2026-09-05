@@ -1,4 +1,4 @@
-# GrainDelay
+# krain
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -22,10 +22,10 @@ The first configure clones JUCE (a few minutes); afterwards it is cached in
 `build/_deps`. Artefacts land in:
 
 ```
-build/GrainDelay_artefacts/Release/
-├── AU/GrainDelay.component
-├── VST3/GrainDelay.vst3
-└── Standalone/GrainDelay.app
+build/krain_artefacts/Release/
+├── AU/krain.component
+├── VST3/krain.vst3
+└── Standalone/krain.app
 ```
 
 ### Tests
@@ -42,18 +42,18 @@ for each interesting case in `build/renders/`. See **Listening to changes** belo
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `-DCMAKE_OSX_ARCHITECTURES=arm64` | `arm64;x86_64` | Single-arch build — roughly twice as fast while developing. |
-| `-DGRAINDELAY_BUILD_TESTS=OFF` | `ON` | Skip the Catch2 target (and its download). |
-| `-DGRAINDELAY_COPY_PLUGIN_AFTER_BUILD=ON` | `OFF` | Install into `~/Library/Audio/Plug-Ins/` after each build. |
+| `-DKRAIN_BUILD_TESTS=OFF` | `ON` | Skip the Catch2 target (and its download). |
+| `-DKRAIN_COPY_PLUGIN_AFTER_BUILD=ON` | `OFF` | Install into `~/Library/Audio/Plug-Ins/` after each build. |
 
 The build is warning-free under `-Wall -Wextra`. Those flags are attached to an
-interface target (`graindelay_warnings`) that is linked into our own targets only,
+interface target (`krain_warnings`) that is linked into our own targets only,
 so JUCE's sources are compiled with JUCE's own settings.
 
 ### CLion
 
 Open the project folder; CLion picks up `CMakeLists.txt` directly. `Release` is the
 default build type, and `compile_commands.json` is exported so the editor sees the
-exact compile flags. The `GrainDelay_Standalone` target is directly runnable.
+exact compile flags. The `krain_Standalone` target is directly runnable.
 
 ---
 
@@ -61,7 +61,7 @@ exact compile flags. The `GrainDelay_Standalone` target is directly runnable.
 
 ```
                   ┌──────────────────────────────────────────┐
-   host  ───────► │ GrainDelayAudioProcessor                 │
+   host  ───────► │ KrainAudioProcessor                      │
                   │  · AudioProcessorValueTreeState (APVTS)  │
                   │  · tempo sync via AudioPlayHead          │
                   │  · collectParameters() → POD snapshot    │
@@ -69,7 +69,7 @@ exact compile flags. The `GrainDelay_Standalone` target is directly runnable.
                                  │ setParameters() + process()
                                  ▼
                   ┌──────────────────────────────────────────┐
-                  │ graindelay::GrainEngine                  │
+                  │ krain::GrainEngine                       │
                   │                                          │
                   │  scheduler ──► Grain pool (64, fixed)    │
                   │      │              │                    │
@@ -100,12 +100,12 @@ and a dedicated renderer write WAV pairs into `build/renders/`, and a small loca
 web app plays them back A/B.
 
 ```bash
-cmake --build build --target graindelay-render
-./build/tools/graindelay-render --source clicks    # writes six preset renders
+cmake --build build --target krain-render
+./build/tools/krain-render --source clicks    # writes six preset renders
 tools/compare/serve.sh                             # indexes them and opens the app
 ```
 
-`graindelay-render --list` shows the built-in test signals (impulse, click train,
+`krain-render --list` shows the built-in test signals (impulse, click train,
 detuned chord, noise burst, sine sweep) and the presets. `--input yourfile.wav`
 renders your own material instead.
 
@@ -133,7 +133,7 @@ piano from the Logic / GarageBand content already on the machine:
 
 ```bash
 tools/samples.sh
-./build/tools/graindelay-render --input samples/piano-ambient.wav
+./build/tools/krain-render --input samples/piano-ambient.wav
 ```
 
 The compare app (`tools/compare/index.html`) plays **both signals at once** and
@@ -191,7 +191,7 @@ tools/
     └── serve.sh              index + serve + open
 ```
 
-`Source/dsp/` is compiled into a separate static library, `GrainDelayDsp`, which
+`Source/dsp/` is compiled into a separate static library, `KrainDsp`, which
 knows nothing about plug-in formats or hosts. That is what lets the tests render
 audio offline without instantiating an `AudioProcessor`.
 

@@ -4,7 +4,7 @@
 
 #include <array>
 
-namespace graindelay::params
+namespace krain::params
 {
 
 // `inline constexpr` at namespace scope: one shared, compile-time constant across
@@ -55,4 +55,4 @@ inline juce::StringArray divisionNames()
     return names;
 }
 
-} // namespace graindelay::params
+} // namespace krain::params

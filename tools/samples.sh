@@ -33,4 +33,4 @@ stage "$loops/04 Modern RnB/Breathless Piano.caf"  "piano-phrase.wav"
 
 echo
 echo "Render one through the grain engine with, for example:"
-echo "  ./build/tools/graindelay-render --input samples/piano-ambient.wav"
+echo "  ./build/tools/krain-render --input samples/piano-ambient.wav"

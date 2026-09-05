@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace graindelay
+namespace krain
 {
 
 //==============================================================================
@@ -56,4 +56,4 @@ inline float softClip (float x) noexcept
     return std::tanh (x);
 }
 
-} // namespace graindelay
+} // namespace krain

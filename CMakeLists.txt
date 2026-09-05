@@ -8,7 +8,7 @@ if(APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 endif()
 
-project(GrainDelay VERSION 0.1.0 LANGUAGES C CXX)
+project(krain VERSION 0.1.0 LANGUAGES C CXX)
 
 # ---------------------------------------------------------------------------
 # Global build settings
@@ -24,16 +24,16 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-option(GRAINDELAY_BUILD_TESTS "Build the Catch2 unit tests" ON)
-option(GRAINDELAY_COPY_PLUGIN_AFTER_BUILD "Install the built plug-ins into the user plug-in folders" OFF)
+option(KRAIN_BUILD_TESTS "Build the Catch2 unit tests" ON)
+option(KRAIN_COPY_PLUGIN_AFTER_BUILD "Install the built plug-ins into the user plug-in folders" OFF)
 
 # Warning flags applied only to *our* targets - JUCE's own sources are compiled
 # by JUCE's own targets and are not affected by this.
-add_library(graindelay_warnings INTERFACE)
+add_library(krain_warnings INTERFACE)
 if(MSVC)
-    target_compile_options(graindelay_warnings INTERFACE /W4)
+    target_compile_options(krain_warnings INTERFACE /W4)
 else()
-    target_compile_options(graindelay_warnings INTERFACE -Wall -Wextra)
+    target_compile_options(krain_warnings INTERFACE -Wall -Wextra)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -51,57 +51,57 @@ FetchContent_MakeAvailable(JUCE)
 # DSP core - a plain static library so the unit tests can link the DSP
 # without dragging in the whole plug-in wrapper.
 # ---------------------------------------------------------------------------
-add_library(GrainDelayDsp STATIC
+add_library(KrainDsp STATIC
     Source/dsp/DelayBuffer.cpp
     Source/dsp/GrainEngine.cpp)
 
-target_include_directories(GrainDelayDsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Source)
+target_include_directories(KrainDsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Source)
 
-target_link_libraries(GrainDelayDsp
+target_link_libraries(KrainDsp
     PUBLIC
         juce::juce_audio_basics
     PRIVATE
-        graindelay_warnings
+        krain_warnings
         juce::juce_recommended_config_flags)
 
 # The plug-in bundles are shared libraries, so everything linked into them must be
 # position independent code.
-set_target_properties(GrainDelayDsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(KrainDsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # ---------------------------------------------------------------------------
 # The plug-in
 # ---------------------------------------------------------------------------
-juce_add_plugin(GrainDelay
+juce_add_plugin(krain
     COMPANY_NAME            "Herhoffer"
-    BUNDLE_ID               "net.herhoffer.graindelay"
+    BUNDLE_ID               "net.herhoffer.krain"
     PLUGIN_MANUFACTURER_CODE Hrhf
-    PLUGIN_CODE             Grdl
+    PLUGIN_CODE             Krai
     FORMATS                 AU VST3 Standalone
-    PRODUCT_NAME            "GrainDelay"
+    PRODUCT_NAME            "krain"
     DESCRIPTION             "Creative granular delay"
     IS_SYNTH                FALSE
     NEEDS_MIDI_INPUT        FALSE
     NEEDS_MIDI_OUTPUT       FALSE
     IS_MIDI_EFFECT          FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-    COPY_PLUGIN_AFTER_BUILD ${GRAINDELAY_COPY_PLUGIN_AFTER_BUILD}
+    COPY_PLUGIN_AFTER_BUILD ${KRAIN_COPY_PLUGIN_AFTER_BUILD}
     VST3_CATEGORIES         Fx Delay
     AU_MAIN_TYPE            kAudioUnitType_Effect)
 
-target_sources(GrainDelay PRIVATE
+target_sources(krain PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/gui/ParameterComponents.cpp)
 
-target_compile_definitions(GrainDelay PUBLIC
+target_compile_definitions(krain PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0)
 
-target_link_libraries(GrainDelay
+target_link_libraries(krain
     PRIVATE
-        GrainDelayDsp
-        graindelay_warnings
+        KrainDsp
+        krain_warnings
         juce::juce_audio_utils
     PUBLIC
         juce::juce_recommended_config_flags
@@ -116,7 +116,7 @@ add_subdirectory(tools)
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
-if(GRAINDELAY_BUILD_TESTS)
+if(KRAIN_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()

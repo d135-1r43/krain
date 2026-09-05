@@ -1,5 +1,5 @@
 //==============================================================================
-// graindelay-render
+// krain-render
 //
 // Renders test signals through the grain engine and drops source/processed WAV
 // pairs into the renders directory, where the compare app picks them up.
@@ -22,7 +22,7 @@
 
 namespace
 {
-using Parameters = graindelay::GrainEngine::Parameters;
+using Parameters = krain::GrainEngine::Parameters;
 
 //==============================================================================
 // A granular delay is normally used on an aux send, not as an insert - so every
@@ -259,8 +259,8 @@ bool loadInputFile (const std::string& path, std::vector<std::vector<float>>& ch
 //==============================================================================
 void printUsage()
 {
-    std::printf ("graindelay-render - render test signals through the grain engine\n\n");
-    std::printf ("Usage: graindelay-render [options]\n\n");
+    std::printf ("krain-render - render test signals through the grain engine\n\n");
+    std::printf ("Usage: krain-render [options]\n\n");
     std::printf ("  --out-dir DIR     where to write (default: the build renders directory)\n");
     std::printf ("  --source NAME     built-in test signal (default: chord)\n");
     std::printf ("  --input FILE      use an audio file as the source instead\n");
@@ -281,7 +281,7 @@ void printUsage()
 //==============================================================================
 int main (int argc, char* argv[])
 {
-    std::string outDir = GRAINDELAY_RENDER_DIR;
+    std::string outDir = KRAIN_RENDER_DIR;
     std::string sourceName = "chord";
     std::string inputFile;
     std::string onlyPreset;
@@ -353,7 +353,7 @@ int main (int argc, char* argv[])
         if (! onlyPreset.empty() && preset.name != onlyPreset)
             continue;
 
-        graindelay::GrainEngine engine;
+        krain::GrainEngine engine;
         engine.prepare (sampleRate, 2);
 
         auto parameters = preset.parameters;
@@ -396,9 +396,9 @@ int main (int argc, char* argv[])
         const float* sourcePointers[2] { source[0].data(), source[1].data() };
         const float* processedPointers[2] { processed[0].data(), processed[1].data() };
 
-        graindelay::wav::writeFloat32 (outDir + "/" + id + "--source.wav", sourcePointers, 2, numSamples, sampleRate);
-        graindelay::wav::writeFloat32 (outDir + "/" + id + "--processed.wav", processedPointers, 2, numSamples, sampleRate);
-        graindelay::wav::writeSidecar (outDir + "/" + id + ".json", toJson (preset, sourceName, sourceDescription));
+        krain::wav::writeFloat32 (outDir + "/" + id + "--source.wav", sourcePointers, 2, numSamples, sampleRate);
+        krain::wav::writeFloat32 (outDir + "/" + id + "--processed.wav", processedPointers, 2, numSamples, sampleRate);
+        krain::wav::writeSidecar (outDir + "/" + id + ".json", toJson (preset, sourceName, sourceDescription));
 
         std::printf ("  %-28s %6.2f s\n", id.c_str(), (double) numSamples / sampleRate);
         ++rendered;

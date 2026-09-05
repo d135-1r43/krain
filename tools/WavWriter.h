@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace graindelay::wav
+namespace krain::wav
 {
 
 //==============================================================================
@@ -120,4 +120,4 @@ inline bool writeSidecar (const std::string& path, const std::string& json)
     return written == json.size();
 }
 
-} // namespace graindelay::wav
+} // namespace krain::wav

@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-namespace graindelay
+namespace krain
 {
 
 namespace
@@ -271,4 +271,4 @@ void GrainEngine::process (juce::AudioBuffer<float>& buffer) noexcept
     }
 }
 
-} // namespace graindelay
+} // namespace krain

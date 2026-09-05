@@ -2,7 +2,7 @@
 
 #include "ParameterIds.h"
 
-namespace graindelay::gui
+namespace krain::gui
 {
 
 namespace
@@ -134,4 +134,4 @@ void ParameterGroup::resized()
         control->setBounds (bounds.removeFromLeft (columnWidth));
 }
 
-} // namespace graindelay::gui
+} // namespace krain::gui

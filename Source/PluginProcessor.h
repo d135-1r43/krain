@@ -16,11 +16,11 @@
     that is "RAII") or a std::unique_ptr, which is the C++ equivalent of "this object
     owns that one and frees it in its destructor".
 */
-class GrainDelayAudioProcessor final : public juce::AudioProcessor
+class KrainAudioProcessor final : public juce::AudioProcessor
 {
 public:
-    GrainDelayAudioProcessor();
-    ~GrainDelayAudioProcessor() override;
+    KrainAudioProcessor();
+    ~KrainAudioProcessor() override;
 
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -60,7 +60,7 @@ private:
     //==============================================================================
     /** Reads every parameter into a plain snapshot. Called once per block on the
         audio thread - all reads go through std::atomic, so no locking is needed. */
-    graindelay::GrainEngine::Parameters collectParameters() const noexcept;
+    krain::GrainEngine::Parameters collectParameters() const noexcept;
 
     /** Resolves the delay time, honouring tempo sync when it is switched on. */
     float resolveDelayTimeMs() const noexcept;
@@ -85,11 +85,11 @@ private:
     std::atomic<float>* dryWetParam = nullptr;
     std::atomic<float>* freezeParam = nullptr;
 
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
 
     /** Host tempo, refreshed once per block on the audio thread and read by
         resolveDelayTimeMs(). Plain double: only the audio thread touches it. */
     double hostBpm = 120.0;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GrainDelayAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KrainAudioProcessor)
 };

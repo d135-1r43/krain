@@ -3,7 +3,7 @@
 
 namespace
 {
-using namespace graindelay;
+using namespace krain;
 
 juce::String msSuffix() { return " ms"; }
 
@@ -22,7 +22,7 @@ std::unique_ptr<juce::AudioParameterFloat> makeFloat (const char* id,
 } // namespace
 
 //==============================================================================
-juce::AudioProcessorValueTreeState::ParameterLayout GrainDelayAudioProcessor::createParameterLayout()
+juce::AudioProcessorValueTreeState::ParameterLayout KrainAudioProcessor::createParameterLayout()
 {
     using Range = juce::NormalisableRange<float>;
 
@@ -73,36 +73,36 @@ juce::AudioProcessorValueTreeState::ParameterLayout GrainDelayAudioProcessor::cr
 }
 
 //==============================================================================
-GrainDelayAudioProcessor::GrainDelayAudioProcessor()
+KrainAudioProcessor::KrainAudioProcessor()
     : AudioProcessor (BusesProperties()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts (*this, nullptr, "GRAINDELAY", createParameterLayout())
+      apvts (*this, nullptr, "KRAIN", createParameterLayout())
 {
     // Resolve the parameter pointers once, here, so processBlock() never has to
     // look anything up by name.
     const auto fetch = [this] (const char* id) { return apvts.getRawParameterValue (id); };
 
-    delayTimeParam = fetch (graindelay::params::delayTime);
-    syncEnabledParam = fetch (graindelay::params::syncEnabled);
-    syncDivisionParam = fetch (graindelay::params::syncDivision);
-    grainSizeParam = fetch (graindelay::params::grainSize);
-    densityParam = fetch (graindelay::params::density);
-    jitterParam = fetch (graindelay::params::jitter);
-    pitchParam = fetch (graindelay::params::pitch);
-    pitchSprayParam = fetch (graindelay::params::pitchSpray);
-    positionSprayParam = fetch (graindelay::params::positionSpray);
-    reverseProbabilityParam = fetch (graindelay::params::reverseProbability);
-    feedbackParam = fetch (graindelay::params::feedback);
-    filterCutoffParam = fetch (graindelay::params::filterCutoff);
-    dryWetParam = fetch (graindelay::params::dryWet);
-    freezeParam = fetch (graindelay::params::freeze);
+    delayTimeParam = fetch (krain::params::delayTime);
+    syncEnabledParam = fetch (krain::params::syncEnabled);
+    syncDivisionParam = fetch (krain::params::syncDivision);
+    grainSizeParam = fetch (krain::params::grainSize);
+    densityParam = fetch (krain::params::density);
+    jitterParam = fetch (krain::params::jitter);
+    pitchParam = fetch (krain::params::pitch);
+    pitchSprayParam = fetch (krain::params::pitchSpray);
+    positionSprayParam = fetch (krain::params::positionSpray);
+    reverseProbabilityParam = fetch (krain::params::reverseProbability);
+    feedbackParam = fetch (krain::params::feedback);
+    filterCutoffParam = fetch (krain::params::filterCutoff);
+    dryWetParam = fetch (krain::params::dryWet);
+    freezeParam = fetch (krain::params::freeze);
 }
 
-GrainDelayAudioProcessor::~GrainDelayAudioProcessor() = default;
+KrainAudioProcessor::~KrainAudioProcessor() = default;
 
 //==============================================================================
-void GrainDelayAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void KrainAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     juce::ignoreUnused (samplesPerBlock);
 
@@ -113,11 +113,11 @@ void GrainDelayAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     engine.reset();
 }
 
-void GrainDelayAudioProcessor::releaseResources()
+void KrainAudioProcessor::releaseResources()
 {
 }
 
-bool GrainDelayAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool KrainAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto& out = layouts.getMainOutputChannelSet();
 
@@ -128,22 +128,22 @@ bool GrainDelayAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 }
 
 //==============================================================================
-float GrainDelayAudioProcessor::resolveDelayTimeMs() const noexcept
+float KrainAudioProcessor::resolveDelayTimeMs() const noexcept
 {
     if (syncEnabledParam->load() < 0.5f)
         return delayTimeParam->load();
 
-    const auto index = juce::jlimit (0, (int) graindelay::params::divisions.size() - 1,
+    const auto index = juce::jlimit (0, (int) krain::params::divisions.size() - 1,
                                      (int) syncDivisionParam->load());
-    const auto quarterNotes = graindelay::params::divisions[(size_t) index].quarterNotes;
+    const auto quarterNotes = krain::params::divisions[(size_t) index].quarterNotes;
     const auto quarterNoteMs = 60000.0 / juce::jlimit (20.0, 300.0, hostBpm);
 
     return (float) juce::jlimit (1.0, 4000.0, quarterNotes * quarterNoteMs);
 }
 
-graindelay::GrainEngine::Parameters GrainDelayAudioProcessor::collectParameters() const noexcept
+krain::GrainEngine::Parameters KrainAudioProcessor::collectParameters() const noexcept
 {
-    graindelay::GrainEngine::Parameters p;
+    krain::GrainEngine::Parameters p;
 
     p.delayTimeMs = resolveDelayTimeMs();
     p.grainSizeMs = grainSizeParam->load();
@@ -161,7 +161,7 @@ graindelay::GrainEngine::Parameters GrainDelayAudioProcessor::collectParameters(
     return p;
 }
 
-void GrainDelayAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+void KrainAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ignoreUnused (midi);
 
@@ -184,19 +184,19 @@ void GrainDelayAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 }
 
 //==============================================================================
-juce::AudioProcessorEditor* GrainDelayAudioProcessor::createEditor()
+juce::AudioProcessorEditor* KrainAudioProcessor::createEditor()
 {
     // The host takes ownership of the returned pointer and deletes it.
-    return new GrainDelayAudioProcessorEditor (*this);
+    return new KrainAudioProcessorEditor (*this);
 }
 
-void GrainDelayAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+void KrainAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     if (auto xml = apvts.copyState().createXml())
         copyXmlToBinary (*xml, destData);
 }
 
-void GrainDelayAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+void KrainAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
@@ -207,5 +207,5 @@ void GrainDelayAudioProcessor::setStateInformation (const void* data, int sizeIn
 // The entry point the plug-in wrappers call to create an instance.
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new GrainDelayAudioProcessor();
+    return new KrainAudioProcessor();
 }

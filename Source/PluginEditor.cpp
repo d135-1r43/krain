@@ -9,23 +9,23 @@ constexpr int margin = 10;
 } // namespace
 
 //==============================================================================
-GrainDelayAudioProcessorEditor::GrainDelayAudioProcessorEditor (GrainDelayAudioProcessor& p)
+KrainAudioProcessorEditor::KrainAudioProcessorEditor (KrainAudioProcessor& p)
     : AudioProcessorEditor (&p),
       processorRef (p),
-      delayTime (p.getValueTreeState(), graindelay::params::delayTime, "Time"),
-      syncEnabled (p.getValueTreeState(), graindelay::params::syncEnabled, "Sync"),
-      syncDivision (p.getValueTreeState(), graindelay::params::syncDivision, "Division"),
-      feedback (p.getValueTreeState(), graindelay::params::feedback, "Feedback"),
-      grainSize (p.getValueTreeState(), graindelay::params::grainSize, "Size"),
-      density (p.getValueTreeState(), graindelay::params::density, "Density"),
-      jitter (p.getValueTreeState(), graindelay::params::jitter, "Jitter"),
-      pitch (p.getValueTreeState(), graindelay::params::pitch, "Pitch"),
-      pitchSpray (p.getValueTreeState(), graindelay::params::pitchSpray, "Pitch Spray"),
-      positionSpray (p.getValueTreeState(), graindelay::params::positionSpray, "Pos Spray"),
-      reverseProbability (p.getValueTreeState(), graindelay::params::reverseProbability, "Reverse"),
-      filterCutoff (p.getValueTreeState(), graindelay::params::filterCutoff, "Filter"),
-      dryWet (p.getValueTreeState(), graindelay::params::dryWet, "Dry/Wet"),
-      freeze (p.getValueTreeState(), graindelay::params::freeze, "Freeze")
+      delayTime (p.getValueTreeState(), krain::params::delayTime, "Time"),
+      syncEnabled (p.getValueTreeState(), krain::params::syncEnabled, "Sync"),
+      syncDivision (p.getValueTreeState(), krain::params::syncDivision, "Division"),
+      feedback (p.getValueTreeState(), krain::params::feedback, "Feedback"),
+      grainSize (p.getValueTreeState(), krain::params::grainSize, "Size"),
+      density (p.getValueTreeState(), krain::params::density, "Density"),
+      jitter (p.getValueTreeState(), krain::params::jitter, "Jitter"),
+      pitch (p.getValueTreeState(), krain::params::pitch, "Pitch"),
+      pitchSpray (p.getValueTreeState(), krain::params::pitchSpray, "Pitch Spray"),
+      positionSpray (p.getValueTreeState(), krain::params::positionSpray, "Pos Spray"),
+      reverseProbability (p.getValueTreeState(), krain::params::reverseProbability, "Reverse"),
+      filterCutoff (p.getValueTreeState(), krain::params::filterCutoff, "Filter"),
+      dryWet (p.getValueTreeState(), krain::params::dryWet, "Dry/Wet"),
+      freeze (p.getValueTreeState(), krain::params::freeze, "Freeze")
 {
     for (auto* group : { &delayGroup, &grainGroup, &modulationGroup, &outputGroup })
         addAndMakeVisible (*group);
@@ -53,10 +53,10 @@ GrainDelayAudioProcessorEditor::GrainDelayAudioProcessorEditor (GrainDelayAudioP
     setSize (820, 460);
 }
 
-GrainDelayAudioProcessorEditor::~GrainDelayAudioProcessorEditor() = default;
+KrainAudioProcessorEditor::~KrainAudioProcessorEditor() = default;
 
 //==============================================================================
-void GrainDelayAudioProcessorEditor::paint (juce::Graphics& g)
+void KrainAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 
@@ -73,7 +73,7 @@ void GrainDelayAudioProcessorEditor::paint (juce::Graphics& g)
                 juce::Justification::centredRight);
 }
 
-void GrainDelayAudioProcessorEditor::resized()
+void KrainAudioProcessorEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (margin);
     bounds.removeFromTop (headerHeight);

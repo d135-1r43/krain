@@ -12,7 +12,7 @@ port="${PORT:-8420}"
 if [ ! -d "$renders" ]; then
   echo "No renders directory at $renders"
   echo "Build and run the renderer first:"
-  echo "  cmake --build build --target graindelay-render && ./build/tools/graindelay-render"
+  echo "  cmake --build build --target krain-render && ./build/tools/krain-render"
   exit 1
 fi
 

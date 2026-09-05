@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Grain A/B</title>
+<title>krain A/B</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;450;600&display=swap">
@@ -388,7 +388,7 @@ body.dragging .empty-inner { outline: 2px dashed var(--processed); outline-offse
 <body>
 
 <header class="topbar">
-  <div class="brand">Grain<span>A/B</span></div>
+  <div class="brand">krain<span>A/B</span></div>
   <div class="meta-pair"><span class="label">Rate</span><span class="value" id="metaRate">—</span></div>
   <div class="meta-pair"><span class="label">Renders</span><span class="value" id="metaCount">—</span></div>
   <div class="spacer"></div>
@@ -404,8 +404,8 @@ body.dragging .empty-inner { outline: 2px dashed var(--processed); outline-offse
         <h2>No renders found</h2>
         <p>Render a batch, then reload. Or drop a pair of WAV files named
            <code>&lt;id&gt;--source.wav</code> and <code>&lt;id&gt;--processed.wav</code> anywhere on this page.</p>
-        <pre>cmake --build build --target graindelay-render
-./build/tools/graindelay-render --source clicks
+        <pre>cmake --build build --target krain-render
+./build/tools/krain-render --source clicks
 tools/compare/serve.sh</pre>
       </div>
     </div>
@@ -527,7 +527,7 @@ const themeButton = $("themeButton");
 const stored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const store = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
 
-const storedTheme = stored("grainab-theme");
+const storedTheme = stored("krain-theme");
 if (storedTheme) document.documentElement.setAttribute("data-theme", storedTheme);
 
 themeButton.addEventListener("click", () => {
@@ -535,7 +535,7 @@ themeButton.addEventListener("click", () => {
   const now = document.documentElement.getAttribute("data-theme") || (dark ? "dark" : "light");
   const next = now === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", next);
-  store("grainab-theme", next);
+  store("krain-theme", next);
   redrawAll();
 });
 
@@ -873,7 +873,7 @@ function setSend(amount) {
   $("modeB").querySelector(".txt").textContent = "Send " + percent + " %";
   $("scopeBSend").textContent = percent + " %";
 
-  store("grainab-send", String(state.send));
+  store("krain-send", String(state.send));
   applyGains();
   scheduleMixRefresh();
 }
@@ -1073,7 +1073,7 @@ window.addEventListener("resize", redrawAll);
 })();
 
 setMode("b");
-setSend(Number(stored("grainab-send") ?? 0.2));
+setSend(Number(stored("krain-send") ?? 0.2));
 boot();
 </script>
 </body>

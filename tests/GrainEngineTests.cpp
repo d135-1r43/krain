@@ -117,7 +117,7 @@ void capture (const std::string& id,
               const std::vector<std::vector<float>>& source,
               const std::vector<std::vector<float>>& processed)
 {
-    const std::string directory = GRAINDELAY_RENDER_DIR;
+    const std::string directory = KRAIN_RENDER_DIR;
 
     std::error_code errorCode;
     std::filesystem::create_directories (directory, errorCode);
@@ -126,10 +126,10 @@ void capture (const std::string& id,
     const float* sourcePointers[2] { source[0].data(), source[1].data() };
     const float* processedPointers[2] { processed[0].data(), processed[1].data() };
 
-    graindelay::wav::writeFloat32 (directory + "/" + id + "--source.wav", sourcePointers, 2, numSamples, testSampleRate);
-    graindelay::wav::writeFloat32 (directory + "/" + id + "--processed.wav", processedPointers, 2, numSamples, testSampleRate);
+    krain::wav::writeFloat32 (directory + "/" + id + "--source.wav", sourcePointers, 2, numSamples, testSampleRate);
+    krain::wav::writeFloat32 (directory + "/" + id + "--processed.wav", processedPointers, 2, numSamples, testSampleRate);
 
-    graindelay::wav::writeSidecar (directory + "/" + id + ".json",
+    krain::wav::writeSidecar (directory + "/" + id + ".json",
                                    "{\n  \"preset\": \"" + id + "\",\n"
                                    "  \"presetDescription\": \"" + title + "\",\n"
                                    "  \"source\": \"test\",\n"
@@ -142,7 +142,7 @@ void capture (const std::string& id,
     The impulse / noise-burst / silence cases below are all just different callbacks.
 */
 template <typename SampleProvider>
-RenderResult render (graindelay::GrainEngine& engine,
+RenderResult render (krain::GrainEngine& engine,
                      double seconds,
                      SampleProvider&& provider,
                      const std::string& captureId = {},
@@ -224,9 +224,9 @@ RenderResult render (graindelay::GrainEngine& engine,
     return result;
 }
 
-graindelay::GrainEngine::Parameters defaultParameters()
+krain::GrainEngine::Parameters defaultParameters()
 {
-    graindelay::GrainEngine::Parameters p;
+    krain::GrainEngine::Parameters p;
     p.delayTimeMs = 250.0f;
     p.grainSizeMs = 100.0f;
     p.densityHz = 25.0f;
@@ -242,7 +242,7 @@ graindelay::GrainEngine::Parameters defaultParameters()
 //==============================================================================
 TEST_CASE ("DelayBuffer holds at least four seconds", "[delaybuffer]")
 {
-    graindelay::DelayBuffer buffer;
+    krain::DelayBuffer buffer;
 
     SECTION ("at 44.1 kHz it is still sized for 4 s at 96 kHz")
     {
@@ -259,7 +259,7 @@ TEST_CASE ("DelayBuffer holds at least four seconds", "[delaybuffer]")
 
 TEST_CASE ("DelayBuffer reads back what was written", "[delaybuffer]")
 {
-    graindelay::DelayBuffer buffer;
+    krain::DelayBuffer buffer;
     buffer.prepare (2, testSampleRate);
 
     for (int n = 0; n < 1000; ++n)
@@ -294,7 +294,7 @@ TEST_CASE ("DelayBuffer reads back what was written", "[delaybuffer]")
 //==============================================================================
 TEST_CASE ("GrainEngine renders an impulse without NaN or Inf", "[grainengine]")
 {
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
     engine.prepare (testSampleRate, 2);
     engine.setParameters (defaultParameters());
 
@@ -308,7 +308,7 @@ TEST_CASE ("GrainEngine renders an impulse without NaN or Inf", "[grainengine]")
 
 TEST_CASE ("GrainEngine stays silent for silent input", "[grainengine]")
 {
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
     engine.prepare (testSampleRate, 2);
     engine.setParameters (defaultParameters());
 
@@ -320,7 +320,7 @@ TEST_CASE ("GrainEngine stays silent for silent input", "[grainengine]")
 
 TEST_CASE ("GrainEngine survives 30 s at feedback 0.95", "[grainengine][stability]")
 {
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
     engine.prepare (testSampleRate, 2);
 
     auto parameters = defaultParameters();
@@ -350,7 +350,7 @@ TEST_CASE ("GrainEngine survives 30 s at feedback 0.95", "[grainengine][stabilit
 
 TEST_CASE ("GrainEngine decays once the input stops", "[grainengine][stability]")
 {
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
     engine.prepare (testSampleRate, 2);
 
     auto parameters = defaultParameters();
@@ -372,7 +372,7 @@ TEST_CASE ("GrainEngine decays once the input stops", "[grainengine][stability]"
 
 TEST_CASE ("Freeze keeps the texture going after the input stops", "[grainengine][freeze]")
 {
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
     engine.prepare (testSampleRate, 2);
 
     auto parameters = defaultParameters();
@@ -394,10 +394,10 @@ TEST_CASE ("Freeze keeps the texture going after the input stops", "[grainengine
 
 TEST_CASE ("Extreme parameter settings stay finite", "[grainengine]")
 {
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
     engine.prepare (testSampleRate, 2);
 
-    graindelay::GrainEngine::Parameters parameters;
+    krain::GrainEngine::Parameters parameters;
     parameters.delayTimeMs = 4000.0f;
     parameters.grainSizeMs = 1000.0f;
     parameters.densityHz = 100.0f;
@@ -438,7 +438,7 @@ TEST_CASE ("Extreme parameter settings stay finite", "[grainengine]")
 
 TEST_CASE ("The grain pool never overflows", "[grainengine]")
 {
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
     engine.prepare (testSampleRate, 2);
 
     auto parameters = defaultParameters();
@@ -463,7 +463,7 @@ TEST_CASE ("The grain pool never overflows", "[grainengine]")
     }
 
     // Requesting more overlap than the pool holds must drop grains, not allocate.
-    REQUIRE (highWaterMark <= graindelay::GrainEngine::maxGrains);
+    REQUIRE (highWaterMark <= krain::GrainEngine::maxGrains);
     REQUIRE (highWaterMark > 0);
 }
 
@@ -472,7 +472,7 @@ TEST_CASE ("the allocation counter actually counts", "[realtime][meta]")
 {
     // Positive control. Without this, "process() never allocates" below would also
     // pass if the operator new replacement were silently not linked in.
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
 
     const AllocationGuard guard;
     engine.prepare (testSampleRate, 2);
@@ -482,7 +482,7 @@ TEST_CASE ("the allocation counter actually counts", "[realtime][meta]")
 
 TEST_CASE ("process() never allocates", "[grainengine][realtime]")
 {
-    graindelay::GrainEngine engine;
+    krain::GrainEngine engine;
     engine.prepare (testSampleRate, 2); // this one is *allowed* to allocate
 
     auto parameters = defaultParameters();

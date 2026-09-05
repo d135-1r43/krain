@@ -2,7 +2,7 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
-namespace graindelay
+namespace krain
 {
 
 //==============================================================================
@@ -71,4 +71,4 @@ private:
     JUCE_LEAK_DETECTOR (DelayBuffer)
 };
 
-} // namespace graindelay
+} // namespace krain

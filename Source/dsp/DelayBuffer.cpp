@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-namespace graindelay
+namespace krain
 {
 
 namespace
@@ -94,4 +94,4 @@ float DelayBuffer::readInterpolated (int channel, double index) const noexcept
     return read (channel, makeReadPoint (index));
 }
 
-} // namespace graindelay
+} // namespace krain
