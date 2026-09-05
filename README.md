@@ -1,5 +1,7 @@
 # GrainDelay
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A creative granular delay audio plug-in built with [JUCE 8](https://juce.com).
 
 * **Formats:** VST3, AU, Standalone
@@ -290,3 +292,20 @@ A few C++ specifics that the code comments point at:
 * Stereo spread / per-grain panning.
 * Presets beyond the single default program.
 * Code signing and notarisation for distribution.
+
+---
+
+## Licence
+
+The code in this repository is MIT licensed — see [LICENSE](LICENSE).
+
+One thing worth knowing before you ship a binary: **JUCE itself is not MIT.** It is
+dual-licensed under AGPLv3 or a commercial licence from Raw Material Software. No
+JUCE code lives in this repository — CMake fetches it at build time — so MIT cleanly
+covers everything here. But a compiled plug-in contains JUCE, and distributing that
+is governed by whichever JUCE licence applies to you. Check
+[juce.com/legal](https://juce.com/legal) before releasing builds.
+
+Test material staged by `tools/samples.sh` is Apple factory content from a local
+Logic or GarageBand installation. It is deliberately **not** committed — `samples/`
+is in `.gitignore` — and it is licensed for use with Apple software only.
