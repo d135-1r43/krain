@@ -25,6 +25,9 @@ namespace
 using Parameters = graindelay::GrainEngine::Parameters;
 
 //==============================================================================
+// A granular delay is normally used on an aux send, not as an insert - so every
+// preset renders 100 % wet. What comes out of these files is the return signal on
+// its own; the compare app does the mixing, the way a console would.
 struct Preset
 {
     std::string name;
@@ -43,7 +46,7 @@ std::vector<Preset> makePresets()
         p.grainSizeMs = 120.0f;
         p.densityHz = 20.0f;
         p.feedback = 0.4f;
-        p.dryWet = 0.5f;
+        p.dryWet = 1.0f;
         presets.push_back ({ "default", "The shipping defaults", p, -1.0 });
     }
     {
@@ -56,7 +59,7 @@ std::vector<Preset> makePresets()
         p.pitchSpraySemitones = 0.15f;
         p.feedback = 0.7f;
         p.filterCutoffHz = 6000.0f;
-        p.dryWet = 0.6f;
+        p.dryWet = 1.0f;
         presets.push_back ({ "shimmer", "Octave-up feedback, the classic shimmer", p, -1.0 });
     }
     {
@@ -69,7 +72,7 @@ std::vector<Preset> makePresets()
         p.positionSprayMs = 300.0f;
         p.feedback = 0.5f;
         p.filterCutoffHz = 4000.0f;
-        p.dryWet = 0.8f;
+        p.dryWet = 1.0f;
         presets.push_back ({ "cloud", "Long, sprayed grains - smeared texture", p, -1.0 });
     }
     {
@@ -80,7 +83,7 @@ std::vector<Preset> makePresets()
         p.pitchSemitones = -5.0f;
         p.reverseProbability = 1.0f;
         p.feedback = 0.55f;
-        p.dryWet = 0.7f;
+        p.dryWet = 1.0f;
         presets.push_back ({ "reverse", "Every grain plays backwards, pitched down", p, -1.0 });
     }
     {
@@ -91,7 +94,7 @@ std::vector<Preset> makePresets()
         p.jitter = 0.05f;
         p.feedback = 0.6f;
         p.filterCutoffHz = 9000.0f;
-        p.dryWet = 0.75f;
+        p.dryWet = 1.0f;
         presets.push_back ({ "stutter", "Tiny dense grains - buffer-stutter effect", p, -1.0 });
     }
     {

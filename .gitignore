@@ -16,3 +16,6 @@ DerivedData/
 # Misc
 *.log
 compile_commands.json
+
+# Staged test audio (Apple factory content - never commit)
+samples/

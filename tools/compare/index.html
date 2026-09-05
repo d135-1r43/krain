@@ -283,10 +283,41 @@ button { font: inherit; color: inherit; }
   color: var(--text-faint);
 }
 .ab button .txt { font-family: var(--cond); font-size: var(--step-1); letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; }
+.ab button + button { border-left: 1px solid var(--line); }
 .ab button[aria-pressed="true"] { color: #fff; }
 .ab button[data-side="a"][aria-pressed="true"] { background: var(--source); }
 .ab button[data-side="b"][aria-pressed="true"] { background: var(--processed); }
+.ab button[data-side="r"][aria-pressed="true"] { background: var(--text-dim); }
 .ab button[aria-pressed="true"] .key { border-color: #ffffff59; color: #ffffffcc; }
+
+/* --------------------------------------------------------------- send knob */
+.send {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px 0 12px;
+  border-left: 1px solid var(--line);
+  flex: none;
+}
+.send input[type="range"] {
+  width: 116px;
+  accent-color: var(--processed);
+  cursor: pointer;
+}
+.send .readout {
+  font-family: var(--mono);
+  font-size: var(--step-1);
+  color: var(--text);
+  min-width: 12ch;
+}
+.scope-head .send-tag {
+  font-family: var(--mono);
+  font-size: var(--step-0);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 5px;
+  color: var(--processed);
+}
 
 .time { font-family: var(--mono); font-size: var(--step-1); color: var(--text-dim); flex: none; }
 .time .now { color: var(--text); }
@@ -390,7 +421,7 @@ tools/compare/serve.sh</pre>
         <figure class="scope" id="scopeA" style="margin:0">
           <div class="scope-head">
             <span class="swatch" style="background:var(--source)"></span>
-            <span class="label">A · Source</span>
+            <span class="label">A · Dry</span>
             <div class="stats">
               <span class="stat"><span class="k">Peak</span><span class="v num" id="peakA">—</span></span>
               <span class="stat"><span class="k">RMS</span><span class="v num" id="rmsA">—</span></span>
@@ -402,7 +433,8 @@ tools/compare/serve.sh</pre>
         <figure class="scope" id="scopeB" style="margin:0">
           <div class="scope-head">
             <span class="swatch" style="background:var(--processed)"></span>
-            <span class="label">B · Processed</span>
+            <span class="label">B · Dry + return</span>
+            <span class="send-tag" id="scopeBSend">20 %</span>
             <div class="stats">
               <span class="stat"><span class="k">Peak</span><span class="v num" id="peakB">—</span></span>
               <span class="stat"><span class="k">RMS</span><span class="v num" id="rmsB">—</span></span>
@@ -419,8 +451,15 @@ tools/compare/serve.sh</pre>
         </button>
 
         <div class="ab">
-          <button type="button" data-side="a" aria-pressed="true"><span class="key">A</span><span class="txt">Source</span></button>
-          <button type="button" data-side="b" aria-pressed="false"><span class="key">B</span><span class="txt">Processed</span></button>
+          <button type="button" data-side="a" aria-pressed="false"><span class="key">A</span><span class="txt">Bypass</span></button>
+          <button type="button" data-side="b" id="modeB" aria-pressed="true"><span class="key">B</span><span class="txt">Send 20 %</span></button>
+          <button type="button" data-side="r" aria-pressed="false"><span class="key">R</span><span class="txt">Return</span></button>
+        </div>
+
+        <div class="send">
+          <span class="label">Send</span>
+          <input type="range" id="sendRange" min="0" max="100" step="1" value="20" aria-label="Send amount">
+          <span class="readout" id="sendValue">20 % · −14.0 dB</span>
         </div>
 
         <div class="time"><span class="now" id="timeNow">0.00</span> / <span id="timeTotal">0.00</span> s</div>
@@ -440,8 +479,11 @@ tools/compare/serve.sh</pre>
           <span class="label">Keys</span>
           <div class="keys">
             <div><kbd>Space</kbd> play / pause</div>
-            <div><kbd>A</kbd> <kbd>B</kbd> pick side</div>
+            <div><kbd>A</kbd> bypass</div>
+            <div><kbd>B</kbd> dry + send</div>
+            <div><kbd>R</kbd> return only</div>
             <div><kbd>X</kbd> flip A ↔ B</div>
+            <div><kbd>[</kbd> <kbd>]</kbd> send ∓ 5 %</div>
             <div><kbd>L</kbd> loop</div>
             <div><kbd>M</kbd> match level</div>
             <div><kbd>↑ ↓</kbd> previous / next</div>
@@ -456,11 +498,16 @@ tools/compare/serve.sh</pre>
 "use strict";
 
 // ---------------------------------------------------------------- state
+// The plug-in renders 100 % wet, the way it would sit on an aux send. This page is
+// the console: dry always passes through, and the send knob decides how much of the
+// return gets added on top.
 const state = {
   items: [],
   current: null,
-  buffers: { a: null, b: null },
-  side: "a",
+  buffers: { dry: null, wet: null, mix: null },
+  dryStats: null,
+  mode: "b",     // a = bypass, b = dry + send, r = return on its own
+  send: 0.2,     // linear amplitude, global across every render
   loop: true,
   match: false,
   playing: false,
@@ -469,15 +516,18 @@ const state = {
   matchGain: 1,
 };
 
-let audio = null;      // AudioContext, created on first user gesture
-const nodes = { a: null, b: null, gainA: null, gainB: null, anaA: null, anaB: null };
+let audio = null;   // AudioContext, created on first user gesture
+const nodes = { dry: null, wet: null, dryGain: null, wetGain: null, anaDry: null, anaWet: null };
 
 const $ = (id) => document.getElementById(id);
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 // ---------------------------------------------------------------- theme
 const themeButton = $("themeButton");
-const storedTheme = (() => { try { return localStorage.getItem("grainab-theme"); } catch { return null; } })();
+const stored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+const store = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
+
+const storedTheme = stored("grainab-theme");
 if (storedTheme) document.documentElement.setAttribute("data-theme", storedTheme);
 
 themeButton.addEventListener("click", () => {
@@ -485,7 +535,7 @@ themeButton.addEventListener("click", () => {
   const now = document.documentElement.getAttribute("data-theme") || (dark ? "dark" : "light");
   const next = now === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", next);
-  try { localStorage.setItem("grainab-theme", next); } catch { /* private mode */ }
+  store("grainab-theme", next);
   redrawAll();
 });
 
@@ -531,6 +581,54 @@ function envelope(buffer, columns) {
   return out;
 }
 
+/** dry + send * wet, i.e. exactly what the console bus would carry. */
+function buildMix() {
+  const { dry, wet } = state.buffers;
+  if (!dry || !wet || !audio) { state.buffers.mix = null; return; }
+
+  const length = Math.min(dry.length, wet.length);
+  const channels = Math.min(dry.numberOfChannels, wet.numberOfChannels);
+  const mix = audio.createBuffer(channels, length, dry.sampleRate);
+
+  for (let ch = 0; ch < channels; ch++) {
+    const d = dry.getChannelData(ch);
+    const w = wet.getChannelData(ch);
+    const out = mix.getChannelData(ch);
+    for (let i = 0; i < length; i++) out[i] = d[i] + state.send * w[i];
+  }
+
+  state.buffers.mix = mix;
+}
+
+function refreshStats() {
+  const { mix } = state.buffers;
+  if (!state.dryStats || !mix) return;
+
+  const a = state.dryStats;
+  const b = analyse(mix);
+
+  $("peakA").textContent = fmtDb(toDb(a.peak));
+  $("rmsA").textContent = fmtDb(toDb(a.rms));
+  $("peakB").textContent = fmtDb(toDb(b.peak));
+  $("rmsB").textContent = fmtDb(toDb(b.rms));
+  $("peakA").classList.toggle("hot", a.peak > 1);
+  $("peakB").classList.toggle("hot", b.peak > 1);
+
+  const delta = toDb(b.rms) - toDb(a.rms);
+  $("deltaRms").textContent = Number.isFinite(delta) ? fmtDb(delta) : "—";
+
+  // Adding a send always makes things louder, and louder always sounds better.
+  // Match level takes that bias back out of the comparison.
+  state.matchGain = b.rms > 1e-7 ? Math.min(8, a.rms / b.rms) : 1;
+  applyGains();
+}
+
+let mixTimer = 0;
+function scheduleMixRefresh() {
+  clearTimeout(mixTimer);
+  mixTimer = setTimeout(() => { buildMix(); refreshStats(); redrawAll(); }, 90);
+}
+
 // ------------------------------------------------------------- waveforms
 const waveCache = new WeakMap();
 
@@ -550,8 +648,8 @@ function drawWave(canvas, buffer, colour, softColour) {
   if (!buffer) return;
 
   const mid = height / 2;
-  // Full scale is 1.0, but this plug-in can legitimately exceed it, so the scope
-  // shows a little headroom and marks the 0 dBFS lines explicitly.
+  // Full scale is 1.0, but a send bus can legitimately exceed it, so the scope
+  // shows headroom and marks the 0 dBFS lines explicitly.
   const headroom = 1.35;
   const scale = mid / headroom;
 
@@ -562,7 +660,6 @@ function drawWave(canvas, buffer, colour, softColour) {
     waveCache.set(buffer, peaks);
   }
 
-  // 0 dBFS guides — anything reaching these is at full scale.
   context.strokeStyle = css("--line");
   context.lineWidth = 1;
   context.setLineDash([2, 4]);
@@ -588,7 +685,6 @@ function drawWave(canvas, buffer, colour, softColour) {
     if (clipped) context.fillStyle = colour;
   }
 
-  // playhead
   if (state.current && buffer.duration > 0) {
     const x = (position() / buffer.duration) * width;
     context.fillStyle = softColour;
@@ -614,7 +710,7 @@ function drawSpectrum() {
     context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke();
   }
 
-  if (!nodes.anaA) return;
+  if (!nodes.anaDry) return;
 
   const draw = (analyser, colour, emphasis) => {
     const bins = new Uint8Array(analyser.frequencyBinCount);
@@ -623,7 +719,7 @@ function drawSpectrum() {
     context.lineWidth = emphasis ? 1.75 : 1;
     context.globalAlpha = emphasis ? 1 : 0.45;
     context.beginPath();
-    // Log frequency axis: linear bins waste 90% of the width on the top octave.
+    // Log frequency axis: linear bins waste most of the width on the top octave.
     const nyquist = audio.sampleRate / 2;
     for (let x = 0; x < width; x++) {
       const hz = 20 * Math.pow(nyquist / 20, x / width);
@@ -635,20 +731,23 @@ function drawSpectrum() {
     context.globalAlpha = 1;
   };
 
-  draw(nodes.anaA, css("--source"), state.side === "a");
-  draw(nodes.anaB, css("--processed"), state.side === "b");
+  // The wet curve is measured after the send gain, so it shows what is actually
+  // being added - at 0 % it flatlines, which is the honest picture.
+  draw(nodes.anaDry, css("--source"), state.mode !== "r");
+  draw(nodes.anaWet, css("--processed"), state.mode !== "a");
 }
 
 function redrawAll() {
-  drawWave($("waveA"), state.buffers.a, css("--source"), css("--source-soft"));
-  drawWave($("waveB"), state.buffers.b, css("--processed"), css("--processed-soft"));
+  drawWave($("waveA"), state.buffers.dry, css("--source"), css("--source-soft"));
+  drawWave($("waveB"), state.buffers.mix, css("--processed"), css("--processed-soft"));
   drawSpectrum();
 }
 
 // ------------------------------------------------------------- transport
 function position() {
-  if (!state.buffers.a) return 0;
-  const duration = state.buffers.a.duration;
+  const reference = state.buffers.dry;
+  if (!reference) return 0;
+  const duration = reference.duration;
   if (!state.playing) return Math.min(state.offset, duration);
   const elapsed = state.offset + (audio.currentTime - state.startedAt);
   return state.loop ? elapsed % duration : Math.min(elapsed, duration);
@@ -657,28 +756,34 @@ function position() {
 function ensureAudio() {
   if (audio) return;
   audio = new (window.AudioContext || window.webkitAudioContext)();
-  for (const side of ["a", "b"]) {
+
+  for (const path of ["dry", "wet"]) {
     const gain = audio.createGain();
     const analyser = audio.createAnalyser();
     analyser.fftSize = 2048;
     analyser.smoothingTimeConstant = 0.75;
     gain.connect(analyser);
     analyser.connect(audio.destination);
-    nodes["gain" + side.toUpperCase()] = gain;
-    nodes["ana" + side.toUpperCase()] = analyser;
+    nodes[path + "Gain"] = gain;
+    nodes["ana" + path[0].toUpperCase() + path.slice(1)] = analyser;
   }
   applyGains(0);
 }
 
-/** Both signals always run; A/B is a gain crossfade, so switching is gapless and
-    you compare the same instant rather than two different playthroughs. */
+/** Dry and return both play the whole time; the modes are gain changes, so
+    switching is gapless and you always compare the same instant. */
 function applyGains(rampSeconds = 0.008) {
-  if (!audio) return;
+  if (!audio || !nodes.dryGain) return;
+
+  const scale = state.match && state.mode === "b" ? state.matchGain : 1;
+  let dryTarget = 0, wetTarget = 0;
+
+  if (state.mode === "a") { dryTarget = 1; wetTarget = 0; }
+  else if (state.mode === "b") { dryTarget = scale; wetTarget = state.send * scale; }
+  else { dryTarget = 0; wetTarget = 1; }
+
   const now = audio.currentTime;
-  const bGain = state.match ? state.matchGain : 1;
-  for (const [side, gain, target] of [["a", nodes.gainA, state.side === "a" ? 1 : 0],
-                                      ["b", nodes.gainB, state.side === "b" ? bGain : 0]]) {
-    void side;
+  for (const [gain, target] of [[nodes.dryGain, dryTarget], [nodes.wetGain, wetTarget]]) {
     gain.gain.cancelScheduledValues(now);
     gain.gain.setValueAtTime(gain.gain.value, now);
     gain.gain.linearRampToValueAtTime(target, now + rampSeconds);
@@ -686,22 +791,30 @@ function applyGains(rampSeconds = 0.008) {
 }
 
 function stopSources() {
-  for (const side of ["a", "b"]) {
-    if (nodes[side]) { try { nodes[side].stop(); } catch { /* already stopped */ } nodes[side].disconnect(); nodes[side] = null; }
+  for (const path of ["dry", "wet"]) {
+    if (nodes[path]) {
+      try { nodes[path].stop(); } catch { /* already stopped */ }
+      nodes[path].disconnect();
+      nodes[path] = null;
+    }
   }
 }
 
 function startSources(offset) {
   stopSources();
   ensureAudio();
-  for (const [side, gain] of [["a", nodes.gainA], ["b", nodes.gainB]]) {
+
+  for (const [path, gain] of [["dry", nodes.dryGain], ["wet", nodes.wetGain]]) {
+    const buffer = state.buffers[path];
+    if (!buffer) continue;
     const source = audio.createBufferSource();
-    source.buffer = state.buffers[side];
+    source.buffer = buffer;
     source.loop = state.loop;
     source.connect(gain);
-    source.start(0, offset % state.buffers[side].duration);
-    nodes[side] = source;
+    source.start(0, offset % buffer.duration);
+    nodes[path] = source;
   }
+
   state.offset = offset;
   state.startedAt = audio.currentTime;
   state.playing = true;
@@ -710,7 +823,7 @@ function startSources(offset) {
 }
 
 function play() {
-  if (!state.buffers.a) return;
+  if (!state.buffers.dry) return;
   ensureAudio();
   if (audio.state === "suspended") audio.resume();
   startSources(state.offset);
@@ -735,23 +848,38 @@ function setPlayIcon(playing) {
 }
 
 function seek(fraction) {
-  if (!state.buffers.a) return;
-  const target = Math.max(0, Math.min(1, fraction)) * state.buffers.a.duration;
+  if (!state.buffers.dry) return;
+  const target = Math.max(0, Math.min(1, fraction)) * state.buffers.dry.duration;
   if (state.playing) startSources(target);
   else { state.offset = target; redrawAll(); updateTime(); }
 }
 
-function setSide(side) {
-  state.side = side;
+function setMode(mode) {
+  state.mode = mode;
   for (const button of document.querySelectorAll(".ab button"))
-    button.setAttribute("aria-pressed", String(button.dataset.side === side));
-  $("scopeA").classList.toggle("is-active", side === "a");
-  $("scopeB").classList.toggle("is-active", side === "b");
+    button.setAttribute("aria-pressed", String(button.dataset.side === mode));
+  $("scopeA").classList.toggle("is-active", mode === "a");
+  $("scopeB").classList.toggle("is-active", mode !== "a");
   applyGains();
 }
 
+function setSend(amount) {
+  state.send = Math.max(0, Math.min(1, amount));
+  const percent = Math.round(state.send * 100);
+  const db = toDb(state.send);
+
+  $("sendRange").value = String(percent);
+  $("sendValue").textContent = percent + " % · " + (Number.isFinite(db) ? db.toFixed(1) + " dB" : "−∞");
+  $("modeB").querySelector(".txt").textContent = "Send " + percent + " %";
+  $("scopeBSend").textContent = percent + " %";
+
+  store("grainab-send", String(state.send));
+  applyGains();
+  scheduleMixRefresh();
+}
+
 function updateTime() {
-  const duration = state.buffers.a ? state.buffers.a.duration : 0;
+  const duration = state.buffers.dry ? state.buffers.dry.duration : 0;
   $("timeNow").textContent = position().toFixed(2);
   $("timeTotal").textContent = duration.toFixed(2);
 }
@@ -780,27 +908,23 @@ async function loadItem(item) {
   chips.hidden = chips.children.length === 0;
 
   ensureAudio();
-  const [a, b] = await Promise.all([decode(item.sourceUrl ?? item.source), decode(item.processedUrl ?? item.processed)]);
-  state.buffers = { a, b };
+  const [dry, wet] = await Promise.all([
+    decode(item.sourceUrl ?? item.source),
+    decode(item.processedUrl ?? item.processed),
+  ]);
 
-  const statsA = analyse(a), statsB = analyse(b);
-  $("peakA").textContent = fmtDb(toDb(statsA.peak));
-  $("rmsA").textContent = fmtDb(toDb(statsA.rms));
-  $("peakB").textContent = fmtDb(toDb(statsB.peak));
-  $("rmsB").textContent = fmtDb(toDb(statsB.rms));
-  $("peakB").classList.toggle("hot", statsB.peak > 1);
-  $("peakA").classList.toggle("hot", statsA.peak > 1);
-
-  const delta = toDb(statsB.rms) - toDb(statsA.rms);
-  $("deltaRms").textContent = Number.isFinite(delta) ? fmtDb(delta) : "—";
-  // Louder always sounds better, so offer to take level out of the comparison.
-  state.matchGain = statsB.rms > 1e-7 ? Math.min(8, statsA.rms / statsB.rms) : 1;
+  state.buffers.dry = dry;
+  state.buffers.wet = wet;
+  state.dryStats = analyse(dry);
+  buildMix();
+  refreshStats();
 
   // The file's own rate, not audio.sampleRate - decodeAudioData resamples to the
   // AudioContext rate, so the buffer no longer knows what it was rendered at.
   $("metaRate").textContent = item.sampleRate
     ? (item.sampleRate / 1000).toFixed(item.sampleRate % 1000 ? 1 : 0) + " kHz"
-    : Math.round(a.sampleRate) / 1000 + " kHz \u00b7 resampled";
+    : Math.round(dry.sampleRate) / 1000 + " kHz · resampled";
+
   redrawAll();
   updateTime();
 }
@@ -861,7 +985,7 @@ async function boot() {
     const manifest = await response.json();
     state.items = manifest.items || [];
   } catch {
-    state.items = []; // served from file:// or published standalone - drag and drop still works
+    state.items = []; // file:// or published standalone - drag and drop still works
   }
 
   buildRail(state.items);
@@ -897,7 +1021,9 @@ document.addEventListener("drop", async (event) => {
 // ------------------------------------------------------------------ wiring
 $("playButton").addEventListener("click", togglePlay);
 for (const button of document.querySelectorAll(".ab button"))
-  button.addEventListener("click", () => setSide(button.dataset.side));
+  button.addEventListener("click", () => setMode(button.dataset.side));
+
+$("sendRange").addEventListener("input", (event) => setSend(Number(event.target.value) / 100));
 
 $("loopButton").addEventListener("click", () => {
   state.loop = !state.loop;
@@ -911,8 +1037,7 @@ $("matchButton").addEventListener("click", () => {
   applyGains();
 });
 
-for (const [canvas, id] of [[$("waveA"), "a"], [$("waveB"), "b"]]) {
-  void id;
+for (const canvas of [$("waveA"), $("waveB")]) {
   canvas.addEventListener("click", (event) => {
     const rect = canvas.getBoundingClientRect();
     seek((event.clientX - rect.left) / rect.width);
@@ -922,12 +1047,16 @@ for (const [canvas, id] of [[$("waveA"), "a"], [$("waveB"), "b"]]) {
 document.addEventListener("keydown", (event) => {
   if (event.target.closest("input, textarea")) return;
   const key = event.key.toLowerCase();
+
   if (key === " ") { event.preventDefault(); togglePlay(); }
-  else if (key === "a") setSide("a");
-  else if (key === "b") setSide("b");
-  else if (key === "x") setSide(state.side === "a" ? "b" : "a");
+  else if (key === "a") setMode("a");
+  else if (key === "b") setMode("b");
+  else if (key === "r") setMode("r");
+  else if (key === "x") setMode(state.mode === "a" ? "b" : "a");
   else if (key === "l") $("loopButton").click();
   else if (key === "m") $("matchButton").click();
+  else if (key === "[") setSend(state.send - 0.05);
+  else if (key === "]") setSend(state.send + 0.05);
   else if (key === "arrowup" || key === "arrowdown") {
     event.preventDefault();
     const index = state.items.findIndex((i) => i === state.current);
@@ -939,11 +1068,12 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("resize", redrawAll);
 
 (function frame() {
-  if (state.buffers.a) { redrawAll(); updateTime(); }
+  if (state.buffers.dry) { redrawAll(); updateTime(); }
   requestAnimationFrame(frame);
 })();
 
-setSide("a");
+setMode("b");
+setSend(Number(stored("grainab-send") ?? 0.2));
 boot();
 </script>
 </body>

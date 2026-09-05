@@ -107,6 +107,33 @@ tools/compare/serve.sh                             # indexes them and opens the 
 detuned chord, noise burst, sine sweep) and the presets. `--input yourfile.wav`
 renders your own material instead.
 
+### It is wired as a send, not an insert
+
+A granular delay normally lives on an aux send, so every preset renders **100 % wet**
+and the WAV pair is (dry input, bare return signal). The compare app does the
+mixing, the way a console would — a global send amount, 20 % by default, that
+persists across renders and reloads.
+
+Three listening modes, all gapless because dry and return play the whole time and
+only the gains change:
+
+| Mode | |
+| --- | --- |
+| **A · Bypass** | dry only |
+| **B · Dry + send** | dry + `send` × return — the mix you would print |
+| **R · Return** | the return on its own, the way you would solo an aux |
+
+At 20 % the level barely moves (Δ RMS ≈ +0.1 dB) — which is the point of a send, and
+why the level-match toggle matters less here than it would on an insert.
+
+Test material lives in `samples/` (git-ignored). `tools/samples.sh` stages real
+piano from the Logic / GarageBand content already on the machine:
+
+```bash
+tools/samples.sh
+./build/tools/graindelay-render --input samples/piano-ambient.wav
+```
+
 The compare app (`tools/compare/index.html`) plays **both signals at once** and
 crossfades between them, so A/B switching is gapless and you are comparing the same
 instant rather than two different playthroughs:
@@ -114,7 +141,8 @@ instant rather than two different playthroughs:
 | Key | |
 | --- | --- |
 | `Space` | play / pause |
-| `A` `B` | pick a side, `X` flips |
+| `A` `B` `R` | bypass / dry+send / return only, `X` flips A↔B |
+| `[` `]` | send ∓ 5 % |
 | `L` | loop |
 | `M` | match level — scales the processed signal to the source's RMS, because louder always sounds better and level bias makes A/B worthless |
 | `↑` `↓` | previous / next render |
