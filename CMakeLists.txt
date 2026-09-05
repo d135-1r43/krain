@@ -47,6 +47,27 @@ FetchContent_Declare(JUCE
 FetchContent_MakeAvailable(JUCE)
 
 # ---------------------------------------------------------------------------
+# DSP core - a plain static library so the unit tests can link the DSP
+# without dragging in the whole plug-in wrapper.
+# ---------------------------------------------------------------------------
+add_library(GrainDelayDsp STATIC
+    Source/dsp/DelayBuffer.cpp
+    Source/dsp/GrainEngine.cpp)
+
+target_include_directories(GrainDelayDsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Source)
+
+target_link_libraries(GrainDelayDsp
+    PUBLIC
+        juce::juce_audio_basics
+    PRIVATE
+        graindelay_warnings
+        juce::juce_recommended_config_flags)
+
+# The plug-in bundles are shared libraries, so everything linked into them must be
+# position independent code.
+set_target_properties(GrainDelayDsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# ---------------------------------------------------------------------------
 # The plug-in
 # ---------------------------------------------------------------------------
 juce_add_plugin(GrainDelay
@@ -77,6 +98,7 @@ target_compile_definitions(GrainDelay PUBLIC
 
 target_link_libraries(GrainDelay
     PRIVATE
+        GrainDelayDsp
         graindelay_warnings
         juce::juce_audio_utils
     PUBLIC

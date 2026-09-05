@@ -1,12 +1,102 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+namespace
+{
+using namespace graindelay;
+
+juce::String msSuffix() { return " ms"; }
+
+std::unique_ptr<juce::AudioParameterFloat> makeFloat (const char* id,
+                                                      const juce::String& name,
+                                                      juce::NormalisableRange<float> range,
+                                                      float defaultValue,
+                                                      const juce::String& suffix)
+{
+    return std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { id, 1 },
+                                                        name,
+                                                        range,
+                                                        defaultValue,
+                                                        juce::AudioParameterFloatAttributes().withLabel (suffix));
+}
+} // namespace
+
+//==============================================================================
+juce::AudioProcessorValueTreeState::ParameterLayout GrainDelayAudioProcessor::createParameterLayout()
+{
+    using Range = juce::NormalisableRange<float>;
+
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
+
+    // Skewed ranges put the musically interesting values in the middle of the knob.
+    Range delayRange { 1.0f, 4000.0f, 0.1f };
+    delayRange.setSkewForCentre (500.0f);
+
+    Range grainRange { 5.0f, 1000.0f, 0.1f };
+    grainRange.setSkewForCentre (120.0f);
+
+    Range densityRange { 0.5f, 100.0f, 0.01f };
+    densityRange.setSkewForCentre (20.0f);
+
+    Range cutoffRange { 20.0f, 20000.0f, 1.0f };
+    cutoffRange.setSkewForCentre (2000.0f);
+
+    layout.add (makeFloat (params::delayTime, "Delay Time", delayRange, 350.0f, msSuffix()));
+
+    layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { params::syncEnabled, 1 },
+                                                            "Tempo Sync",
+                                                            false));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { params::syncDivision, 1 },
+                                                              "Division",
+                                                              params::divisionNames(),
+                                                              8)); // 1/4
+
+    layout.add (makeFloat (params::grainSize, "Grain Size", grainRange, 120.0f, msSuffix()));
+    layout.add (makeFloat (params::density, "Density", densityRange, 20.0f, " /s"));
+    layout.add (makeFloat (params::jitter, "Jitter", Range { 0.0f, 1.0f, 0.001f }, 0.25f, {}));
+
+    layout.add (makeFloat (params::pitch, "Pitch", Range { -24.0f, 24.0f, 0.01f }, 0.0f, " st"));
+    layout.add (makeFloat (params::pitchSpray, "Pitch Spray", Range { 0.0f, 12.0f, 0.01f }, 0.0f, " st"));
+    layout.add (makeFloat (params::positionSpray, "Position Spray", Range { 0.0f, 500.0f, 0.1f }, 0.0f, msSuffix()));
+    layout.add (makeFloat (params::reverseProbability, "Reverse", Range { 0.0f, 1.0f, 0.001f }, 0.0f, {}));
+
+    layout.add (makeFloat (params::feedback, "Feedback", Range { 0.0f, 1.2f, 0.001f }, 0.4f, {}));
+    layout.add (makeFloat (params::filterCutoff, "Filter", cutoffRange, 8000.0f, " Hz"));
+    layout.add (makeFloat (params::dryWet, "Dry/Wet", Range { 0.0f, 1.0f, 0.001f }, 0.5f, {}));
+
+    layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { params::freeze, 1 },
+                                                            "Freeze",
+                                                            false));
+
+    return layout;
+}
+
 //==============================================================================
 GrainDelayAudioProcessor::GrainDelayAudioProcessor()
     : AudioProcessor (BusesProperties()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
-                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
+                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+      apvts (*this, nullptr, "GRAINDELAY", createParameterLayout())
 {
+    // Resolve the parameter pointers once, here, so processBlock() never has to
+    // look anything up by name.
+    const auto fetch = [this] (const char* id) { return apvts.getRawParameterValue (id); };
+
+    delayTimeParam = fetch (graindelay::params::delayTime);
+    syncEnabledParam = fetch (graindelay::params::syncEnabled);
+    syncDivisionParam = fetch (graindelay::params::syncDivision);
+    grainSizeParam = fetch (graindelay::params::grainSize);
+    densityParam = fetch (graindelay::params::density);
+    jitterParam = fetch (graindelay::params::jitter);
+    pitchParam = fetch (graindelay::params::pitch);
+    pitchSprayParam = fetch (graindelay::params::pitchSpray);
+    positionSprayParam = fetch (graindelay::params::positionSpray);
+    reverseProbabilityParam = fetch (graindelay::params::reverseProbability);
+    feedbackParam = fetch (graindelay::params::feedback);
+    filterCutoffParam = fetch (graindelay::params::filterCutoff);
+    dryWetParam = fetch (graindelay::params::dryWet);
+    freezeParam = fetch (graindelay::params::freeze);
 }
 
 GrainDelayAudioProcessor::~GrainDelayAudioProcessor() = default;
@@ -14,7 +104,13 @@ GrainDelayAudioProcessor::~GrainDelayAudioProcessor() = default;
 //==============================================================================
 void GrainDelayAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    juce::ignoreUnused (samplesPerBlock);
+
+    // This is where every allocation happens. After this returns, the audio thread
+    // must never need another byte of heap.
+    engine.prepare (sampleRate, juce::jmax (1, getTotalNumOutputChannels()));
+    engine.setParameters (collectParameters());
+    engine.reset();
 }
 
 void GrainDelayAudioProcessor::releaseResources()
@@ -32,6 +128,39 @@ bool GrainDelayAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 }
 
 //==============================================================================
+float GrainDelayAudioProcessor::resolveDelayTimeMs() const noexcept
+{
+    if (syncEnabledParam->load() < 0.5f)
+        return delayTimeParam->load();
+
+    const auto index = juce::jlimit (0, (int) graindelay::params::divisions.size() - 1,
+                                     (int) syncDivisionParam->load());
+    const auto quarterNotes = graindelay::params::divisions[(size_t) index].quarterNotes;
+    const auto quarterNoteMs = 60000.0 / juce::jlimit (20.0, 300.0, hostBpm);
+
+    return (float) juce::jlimit (1.0, 4000.0, quarterNotes * quarterNoteMs);
+}
+
+graindelay::GrainEngine::Parameters GrainDelayAudioProcessor::collectParameters() const noexcept
+{
+    graindelay::GrainEngine::Parameters p;
+
+    p.delayTimeMs = resolveDelayTimeMs();
+    p.grainSizeMs = grainSizeParam->load();
+    p.densityHz = densityParam->load();
+    p.jitter = jitterParam->load();
+    p.pitchSemitones = pitchParam->load();
+    p.pitchSpraySemitones = pitchSprayParam->load();
+    p.positionSprayMs = positionSprayParam->load();
+    p.reverseProbability = reverseProbabilityParam->load();
+    p.feedback = feedbackParam->load();
+    p.filterCutoffHz = filterCutoffParam->load();
+    p.dryWet = dryWetParam->load();
+    p.freeze = freezeParam->load() >= 0.5f;
+
+    return p;
+}
+
 void GrainDelayAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ignoreUnused (midi);
@@ -45,7 +174,13 @@ void GrainDelayAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     for (auto ch = getTotalNumInputChannels(); ch < getTotalNumOutputChannels(); ++ch)
         buffer.clear (ch, 0, buffer.getNumSamples());
 
-    // Pass-through for now - the DSP lands in the next step.
+    if (auto* playHead = getPlayHead())
+        if (const auto position = playHead->getPosition())
+            if (const auto bpm = position->getBpm())
+                hostBpm = *bpm;
+
+    engine.setParameters (collectParameters());
+    engine.process (buffer);
 }
 
 //==============================================================================
@@ -57,12 +192,15 @@ juce::AudioProcessorEditor* GrainDelayAudioProcessor::createEditor()
 
 void GrainDelayAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    juce::ignoreUnused (destData);
+    if (auto xml = apvts.copyState().createXml())
+        copyXmlToBinary (*xml, destData);
 }
 
 void GrainDelayAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    juce::ignoreUnused (data, sizeInBytes);
+    if (auto xml = getXmlFromBinary (data, sizeInBytes))
+        if (xml->hasTagName (apvts.state.getType()))
+            apvts.replaceState (juce::ValueTree::fromXml (*xml));
 }
 
 //==============================================================================
