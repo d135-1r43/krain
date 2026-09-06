@@ -32,8 +32,8 @@ private:
     // first, so they are destroyed last.
     krain::gui::ParameterGroup delayGroup { "DELAY" };
     krain::gui::ParameterGroup grainGroup { "GRAIN" };
-    krain::gui::ParameterGroup modulationGroup { "MODULATION" };
-    krain::gui::ParameterGroup outputGroup { "OUTPUT" };
+    krain::gui::ParameterGroup pitchGroup { "PITCH" };
+    krain::gui::ParameterGroup spaceGroup { "SPACE" };
 
     krain::gui::ParameterSlider delayTime;
     krain::gui::ParameterToggle syncEnabled;
@@ -43,13 +43,17 @@ private:
     krain::gui::ParameterSlider grainSize;
     krain::gui::ParameterSlider density;
     krain::gui::ParameterSlider jitter;
-
-    krain::gui::ParameterSlider pitch;
-    krain::gui::ParameterSlider pitchSpray;
     krain::gui::ParameterSlider positionSpray;
     krain::gui::ParameterSlider reverseProbability;
 
+    krain::gui::ParameterSlider pitch;
+    krain::gui::ParameterChoice intervals;
+    krain::gui::ParameterSlider pitchSpray;
+    krain::gui::ParameterSlider drift;
+
     krain::gui::ParameterSlider filterCutoff;
+    krain::gui::ParameterSlider diffusion;
+    krain::gui::ParameterSlider stereoWidth;
     krain::gui::ParameterSlider dryWet;
     krain::gui::ParameterToggle freeze;
 

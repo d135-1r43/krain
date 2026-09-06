@@ -19,15 +19,19 @@ KrainAudioProcessorEditor::KrainAudioProcessorEditor (KrainAudioProcessor& p)
       grainSize (p.getValueTreeState(), krain::params::grainSize, "Size"),
       density (p.getValueTreeState(), krain::params::density, "Density"),
       jitter (p.getValueTreeState(), krain::params::jitter, "Jitter"),
-      pitch (p.getValueTreeState(), krain::params::pitch, "Pitch"),
-      pitchSpray (p.getValueTreeState(), krain::params::pitchSpray, "Pitch Spray"),
       positionSpray (p.getValueTreeState(), krain::params::positionSpray, "Pos Spray"),
       reverseProbability (p.getValueTreeState(), krain::params::reverseProbability, "Reverse"),
+      pitch (p.getValueTreeState(), krain::params::pitch, "Pitch"),
+      intervals (p.getValueTreeState(), krain::params::intervals, "Intervals"),
+      pitchSpray (p.getValueTreeState(), krain::params::pitchSpray, "Spray"),
+      drift (p.getValueTreeState(), krain::params::drift, "Drift"),
       filterCutoff (p.getValueTreeState(), krain::params::filterCutoff, "Filter"),
+      diffusion (p.getValueTreeState(), krain::params::diffusion, "Diffusion"),
+      stereoWidth (p.getValueTreeState(), krain::params::stereoWidth, "Width"),
       dryWet (p.getValueTreeState(), krain::params::dryWet, "Dry/Wet"),
       freeze (p.getValueTreeState(), krain::params::freeze, "Freeze")
 {
-    for (auto* group : { &delayGroup, &grainGroup, &modulationGroup, &outputGroup })
+    for (auto* group : { &delayGroup, &grainGroup, &pitchGroup, &spaceGroup })
         addAndMakeVisible (*group);
 
     delayGroup.addControl (delayTime);
@@ -38,19 +42,23 @@ KrainAudioProcessorEditor::KrainAudioProcessorEditor (KrainAudioProcessor& p)
     grainGroup.addControl (grainSize);
     grainGroup.addControl (density);
     grainGroup.addControl (jitter);
+    grainGroup.addControl (positionSpray);
+    grainGroup.addControl (reverseProbability);
 
-    modulationGroup.addControl (pitch);
-    modulationGroup.addControl (pitchSpray);
-    modulationGroup.addControl (positionSpray);
-    modulationGroup.addControl (reverseProbability);
+    pitchGroup.addControl (pitch);
+    pitchGroup.addControl (intervals);
+    pitchGroup.addControl (pitchSpray);
+    pitchGroup.addControl (drift);
 
-    outputGroup.addControl (filterCutoff);
-    outputGroup.addControl (dryWet);
-    outputGroup.addControl (freeze);
+    spaceGroup.addControl (filterCutoff);
+    spaceGroup.addControl (diffusion);
+    spaceGroup.addControl (stereoWidth);
+    spaceGroup.addControl (dryWet);
+    spaceGroup.addControl (freeze);
 
     setResizable (true, true);
-    setResizeLimits (700, 420, 1400, 840);
-    setSize (820, 460);
+    setResizeLimits (760, 440, 1520, 880);
+    setSize (900, 480);
 }
 
 KrainAudioProcessorEditor::~KrainAudioProcessorEditor() = default;
@@ -89,11 +97,11 @@ void KrainAudioProcessorEditor::resized()
         return std::pair { row.removeFromLeft (leftWidth).withTrimmedRight (margin / 2), row.withTrimmedLeft (margin / 2) };
     };
 
-    const auto [delayArea, grainArea] = split (topRow, 4, 3);
+    const auto [delayArea, grainArea] = split (topRow, 4, 5);
     delayGroup.setBounds (delayArea);
     grainGroup.setBounds (grainArea);
 
-    const auto [modArea, outArea] = split (bounds, 4, 3);
-    modulationGroup.setBounds (modArea);
-    outputGroup.setBounds (outArea);
+    const auto [pitchArea, spaceArea] = split (bounds, 4, 5);
+    pitchGroup.setBounds (pitchArea);
+    spaceGroup.setBounds (spaceArea);
 }

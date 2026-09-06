@@ -78,11 +78,15 @@ private:
     std::atomic<float>* jitterParam = nullptr;
     std::atomic<float>* pitchParam = nullptr;
     std::atomic<float>* pitchSprayParam = nullptr;
+    std::atomic<float>* intervalsParam = nullptr;
     std::atomic<float>* positionSprayParam = nullptr;
     std::atomic<float>* reverseProbabilityParam = nullptr;
     std::atomic<float>* feedbackParam = nullptr;
     std::atomic<float>* filterCutoffParam = nullptr;
     std::atomic<float>* dryWetParam = nullptr;
+    std::atomic<float>* stereoWidthParam = nullptr;
+    std::atomic<float>* diffusionParam = nullptr;
+    std::atomic<float>* driftParam = nullptr;
     std::atomic<float>* freezeParam = nullptr;
 
     krain::GrainEngine engine;

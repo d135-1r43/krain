@@ -28,6 +28,21 @@ using Parameters = krain::GrainEngine::Parameters;
 // A granular delay is normally used on an aux send, not as an insert - so every
 // preset renders 100 % wet. What comes out of these files is the return signal on
 // its own; the compare app does the mixing, the way a console would.
+/** Local, so this tool does not have to link juce_audio_processors just to spell
+    an interval set. Order matches krain::IntervalSet. */
+const char* intervalName (krain::IntervalSet set)
+{
+    switch (set)
+    {
+        case krain::IntervalSet::octaveUp:    return "Octave Up";
+        case krain::IntervalSet::fifthOctave: return "Fifth + Octave";
+        case krain::IntervalSet::shimmer:     return "Shimmer";
+        case krain::IntervalSet::octaveDown:  return "Octave Down";
+        case krain::IntervalSet::free:
+        default:                              return "Free";
+    }
+}
+
 struct Preset
 {
     std::string name;
@@ -42,70 +57,100 @@ std::vector<Preset> makePresets()
 
     {
         Parameters p;
-        p.delayTimeMs = 350.0f;
-        p.grainSizeMs = 120.0f;
-        p.densityHz = 20.0f;
-        p.feedback = 0.4f;
-        p.dryWet = 1.0f;
-        presets.push_back ({ "default", "The shipping defaults", p, -1.0 });
-    }
-    {
-        Parameters p;
-        p.delayTimeMs = 400.0f;
-        p.grainSizeMs = 150.0f;
-        p.densityHz = 40.0f;
-        p.jitter = 0.3f;
-        p.pitchSemitones = 12.0f;
-        p.pitchSpraySemitones = 0.15f;
-        p.feedback = 0.7f;
-        p.filterCutoffHz = 6000.0f;
-        p.dryWet = 1.0f;
-        presets.push_back ({ "shimmer", "Octave-up feedback, the classic shimmer", p, -1.0 });
-    }
-    {
-        Parameters p;
-        p.delayTimeMs = 600.0f;
-        p.grainSizeMs = 400.0f;
-        p.densityHz = 12.0f;
-        p.jitter = 0.8f;
-        p.pitchSpraySemitones = 5.0f;
-        p.positionSprayMs = 300.0f;
-        p.feedback = 0.5f;
-        p.filterCutoffHz = 4000.0f;
-        p.dryWet = 1.0f;
-        presets.push_back ({ "cloud", "Long, sprayed grains - smeared texture", p, -1.0 });
-    }
-    {
-        Parameters p;
-        p.delayTimeMs = 500.0f;
-        p.grainSizeMs = 250.0f;
-        p.densityHz = 18.0f;
-        p.pitchSemitones = -5.0f;
-        p.reverseProbability = 1.0f;
+        p.delayTimeMs = 420.0f;
+        p.grainSizeMs = 180.0f;
+        p.densityHz = 26.0f;
+        p.jitter = 0.35f;
+        p.intervals = krain::IntervalSet::shimmer;
         p.feedback = 0.55f;
+        p.filterCutoffHz = 7000.0f;
+        p.stereoWidth = 0.8f;
+        p.diffusion = 0.4f;
+        p.drift = 0.3f;
         p.dryWet = 1.0f;
-        presets.push_back ({ "reverse", "Every grain plays backwards, pitched down", p, -1.0 });
-    }
-    {
-        Parameters p;
-        p.delayTimeMs = 120.0f;
-        p.grainSizeMs = 25.0f;
-        p.densityHz = 60.0f;
-        p.jitter = 0.05f;
-        p.feedback = 0.6f;
-        p.filterCutoffHz = 9000.0f;
-        p.dryWet = 1.0f;
-        presets.push_back ({ "stutter", "Tiny dense grains - buffer-stutter effect", p, -1.0 });
+        presets.push_back ({ "default", "The shipping defaults - shimmer intervals, wide, diffused", p, -1.0 });
     }
     {
         Parameters p;
         p.delayTimeMs = 500.0f;
-        p.grainSizeMs = 300.0f;
-        p.densityHz = 25.0f;
-        p.jitter = 0.5f;
+        p.grainSizeMs = 220.0f;
+        p.densityHz = 34.0f;
+        p.jitter = 0.4f;
+        p.intervals = krain::IntervalSet::shimmer;
+        p.pitchSpraySemitones = 0.12f;
+        p.positionSprayMs = 90.0f;
+        p.feedback = 0.72f;
+        p.filterCutoffHz = 5200.0f;
+        p.stereoWidth = 1.0f;
+        p.diffusion = 0.62f;
+        p.drift = 0.45f;
+        p.dryWet = 1.0f;
+        presets.push_back ({ "shimmer", "Ascending halo over a stable bed - the classic", p, -1.0 });
+    }
+    {
+        Parameters p;
+        p.delayTimeMs = 900.0f;
+        p.grainSizeMs = 600.0f;
+        p.densityHz = 16.0f;
+        p.jitter = 0.9f;
+        p.intervals = krain::IntervalSet::fifthOctave;
+        p.pitchSpraySemitones = 0.2f;
+        p.positionSprayMs = 400.0f;
+        p.feedback = 0.6f;
+        p.filterCutoffHz = 3200.0f;
+        p.stereoWidth = 1.0f;
+        p.diffusion = 0.85f;
+        p.drift = 0.7f;
+        p.dryWet = 1.0f;
+        presets.push_back ({ "cathedral", "Very long grains, heavy diffusion - dissolves into air", p, -1.0 });
+    }
+    {
+        Parameters p;
+        p.delayTimeMs = 260.0f;
+        p.grainSizeMs = 70.0f;
+        p.densityHz = 55.0f;
+        p.jitter = 0.55f;
+        p.intervals = krain::IntervalSet::shimmer;
+        p.pitchSemitones = 12.0f;
         p.pitchSpraySemitones = 0.1f;
-        p.positionSprayMs = 200.0f;
+        p.positionSprayMs = 60.0f;
+        p.feedback = 0.5f;
+        p.filterCutoffHz = 11000.0f;
+        p.stereoWidth = 1.0f;
+        p.diffusion = 0.3f;
+        p.drift = 0.25f;
+        p.dryWet = 1.0f;
+        presets.push_back ({ "glass", "Small bright grains high above the source - sparkle", p, -1.0 });
+    }
+    {
+        Parameters p;
+        p.delayTimeMs = 620.0f;
+        p.grainSizeMs = 320.0f;
+        p.densityHz = 14.0f;
+        p.jitter = 0.75f;
+        p.intervals = krain::IntervalSet::octaveDown;
+        p.positionSprayMs = 250.0f;
+        p.reverseProbability = 0.65f;
+        p.feedback = 0.62f;
+        p.filterCutoffHz = 2400.0f;
+        p.stereoWidth = 0.9f;
+        p.diffusion = 0.7f;
+        p.drift = 0.85f;
+        p.dryWet = 1.0f;
+        presets.push_back ({ "undertow", "Reversed, octave down, heavy drift - dark and unstable", p, -1.0 });
+    }
+    {
+        Parameters p;
+        p.delayTimeMs = 550.0f;
+        p.grainSizeMs = 400.0f;
+        p.densityHz = 22.0f;
+        p.jitter = 0.6f;
+        p.intervals = krain::IntervalSet::shimmer;
+        p.positionSprayMs = 300.0f;
         p.feedback = 0.0f;
+        p.stereoWidth = 1.0f;
+        p.diffusion = 0.55f;
+        p.drift = 0.5f;
         p.dryWet = 1.0f;
         presets.push_back ({ "freeze", "Freeze engages after 2 s - input then stops", p, 2.0 });
     }
@@ -221,6 +266,10 @@ std::string toJson (const Preset& preset, const std::string& sourceName, const s
     json += "    \"feedback\": " + number (p.feedback) + ",\n";
     json += "    \"filterCutoffHz\": " + number (p.filterCutoffHz) + ",\n";
     json += "    \"dryWet\": " + number (p.dryWet) + ",\n";
+    json += "    \"width\": " + number (p.stereoWidth) + ",\n";
+    json += "    \"diffusion\": " + number (p.diffusion) + ",\n";
+    json += "    \"drift\": " + number (p.drift) + ",\n";
+    json += "    \"intervals\": \"" + std::string (intervalName (p.intervals)) + "\",\n";
     json += "    \"freeze\": " + std::string (preset.freezeAfterSeconds >= 0.0 ? "\"after 2 s\"" : "false") + "\n";
     json += "  }\n";
     json += "}\n";

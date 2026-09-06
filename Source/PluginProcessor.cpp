@@ -58,12 +58,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout KrainAudioProcessor::createP
 
     layout.add (makeFloat (params::pitch, "Pitch", Range { -24.0f, 24.0f, 0.01f }, 0.0f, " st"));
     layout.add (makeFloat (params::pitchSpray, "Pitch Spray", Range { 0.0f, 12.0f, 0.01f }, 0.0f, " st"));
+
+    // Defaults to Shimmer, not Free: out of the box this should already do the
+    // thing it is for, rather than behave like a plain delay until you find it.
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { params::intervals, 1 },
+                                                              "Intervals",
+                                                              params::intervalNames(),
+                                                              3));
     layout.add (makeFloat (params::positionSpray, "Position Spray", Range { 0.0f, 500.0f, 0.1f }, 0.0f, msSuffix()));
     layout.add (makeFloat (params::reverseProbability, "Reverse", Range { 0.0f, 1.0f, 0.001f }, 0.0f, {}));
 
     layout.add (makeFloat (params::feedback, "Feedback", Range { 0.0f, 1.2f, 0.001f }, 0.4f, {}));
     layout.add (makeFloat (params::filterCutoff, "Filter", cutoffRange, 8000.0f, " Hz"));
     layout.add (makeFloat (params::dryWet, "Dry/Wet", Range { 0.0f, 1.0f, 0.001f }, 0.5f, {}));
+    layout.add (makeFloat (params::stereoWidth, "Width", Range { 0.0f, 1.0f, 0.001f }, 0.8f, {}));
+    layout.add (makeFloat (params::diffusion, "Diffusion", Range { 0.0f, 1.0f, 0.001f }, 0.4f, {}));
+    layout.add (makeFloat (params::drift, "Drift", Range { 0.0f, 1.0f, 0.001f }, 0.3f, {}));
 
     layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { params::freeze, 1 },
                                                             "Freeze",
@@ -91,11 +101,15 @@ KrainAudioProcessor::KrainAudioProcessor()
     jitterParam = fetch (krain::params::jitter);
     pitchParam = fetch (krain::params::pitch);
     pitchSprayParam = fetch (krain::params::pitchSpray);
+    intervalsParam = fetch (krain::params::intervals);
     positionSprayParam = fetch (krain::params::positionSpray);
     reverseProbabilityParam = fetch (krain::params::reverseProbability);
     feedbackParam = fetch (krain::params::feedback);
     filterCutoffParam = fetch (krain::params::filterCutoff);
     dryWetParam = fetch (krain::params::dryWet);
+    stereoWidthParam = fetch (krain::params::stereoWidth);
+    diffusionParam = fetch (krain::params::diffusion);
+    driftParam = fetch (krain::params::drift);
     freezeParam = fetch (krain::params::freeze);
 }
 
@@ -151,11 +165,16 @@ krain::GrainEngine::Parameters KrainAudioProcessor::collectParameters() const no
     p.jitter = jitterParam->load();
     p.pitchSemitones = pitchParam->load();
     p.pitchSpraySemitones = pitchSprayParam->load();
+    p.intervals = static_cast<krain::IntervalSet> (
+        juce::jlimit (0, 4, (int) intervalsParam->load()));
     p.positionSprayMs = positionSprayParam->load();
     p.reverseProbability = reverseProbabilityParam->load();
     p.feedback = feedbackParam->load();
     p.filterCutoffHz = filterCutoffParam->load();
     p.dryWet = dryWetParam->load();
+    p.stereoWidth = stereoWidthParam->load();
+    p.diffusion = diffusionParam->load();
+    p.drift = driftParam->load();
     p.freeze = freezeParam->load() >= 0.5f;
 
     return p;

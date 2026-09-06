@@ -3,6 +3,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 
 #include "dsp/DelayBuffer.h"
+#include "dsp/Diffuser.h"
 #include "dsp/OnePoleFilter.h"
 
 #include <array>
@@ -25,6 +26,25 @@ struct Grain
     int age = 0;               ///< samples elapsed since the grain started
     int length = 1;            ///< total lifetime in samples
     float gain = 1.0f;
+    float panLeft = 0.70710678f;  ///< constant-power pan weights, fixed for the
+    float panRight = 0.70710678f; ///< grain's whole lifetime so it holds still
+    double channelOffset = 0.0;   ///< samples between the left and right read points
+};
+
+//==============================================================================
+/** How a grain's pitch is chosen.
+
+    Every set except `free` keeps unison in the pool, and that is the entire point:
+    a shimmer is a pitched halo *over* the original, not the original transposed. If
+    every grain rises, the sound simply climbs out of the spectrum and evaporates.
+*/
+enum class IntervalSet
+{
+    free = 0,      ///< continuous, pitch + spray
+    octaveUp,      ///< unison, unison, +12
+    fifthOctave,   ///< unison, unison, +7, +12
+    shimmer,       ///< unison, unison, +12, +19 - the classic ascending halo
+    octaveDown,    ///< unison, unison, -12
 };
 
 //==============================================================================
@@ -54,11 +74,15 @@ public:
         float jitter = 0.25f;               ///< 0..1, randomises the trigger interval
         float pitchSemitones = 0.0f;        ///< -24..+24
         float pitchSpraySemitones = 0.0f;   ///< 0..12, random per-grain detune
+        IntervalSet intervals = IntervalSet::free;
         float positionSprayMs = 0.0f;       ///< 0..500, random per-grain start offset
         float reverseProbability = 0.0f;    ///< 0..1
         float feedback = 0.4f;              ///< 0..1.2
         float filterCutoffHz = 8000.0f;     ///< lowpass inside the feedback loop
         float dryWet = 0.5f;                ///< 0 = dry, 1 = wet
+        float stereoWidth = 0.0f;           ///< 0..1, how far grains scatter L/R
+        float diffusion = 0.0f;             ///< 0..1, allpass wash in the feedback
+        float drift = 0.0f;                 ///< 0..1, slow wander of the read point
         bool freeze = false;                ///< stop writing into the delay buffer
     };
 
@@ -86,6 +110,8 @@ public:
 private:
     void triggerGrain() noexcept;
     void scheduleNextGrain() noexcept;
+    float nextInterval() noexcept;
+    void advanceDrift (int numSamples) noexcept;
     float windowValue (double normalisedAge) const noexcept;
     float lookupHann (double phase) const noexcept;
     float nextBipolarRandom() noexcept;
@@ -103,6 +129,7 @@ private:
 
     std::array<OnePoleFilter, maxChannels> feedbackLowpass {};
     std::array<OnePoleFilter, maxChannels> feedbackDcBlocker {};
+    std::array<Diffuser, maxChannels> diffusers {};
 
     // Allocated once in prepare(); only read from in process().
     std::vector<float> hannTable;
@@ -119,6 +146,13 @@ private:
     float windowAlpha = 1.0f;
 
     double samplesUntilNextGrain = 0.0;
+
+    // Two slow oscillators at unrelated rates. Their sum never repeats on any
+    // musically relevant timescale, so the cloud wanders instead of cycling.
+    double driftPhaseA = 0.0;
+    double driftPhaseB = 1.7;
+    float driftValue = 0.0f;
+
     juce::Random random;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GrainEngine)

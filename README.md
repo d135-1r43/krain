@@ -74,8 +74,8 @@ exact compile flags. The `krain_Standalone` target is directly runnable.
                   │  scheduler ──► Grain pool (64, fixed)    │
                   │      │              │                    │
                   │   density,          │ each grain: start, │
-                  │   jitter            │ length, pitch      │
-                  │                     │ ratio, window      │
+                  │   jitter            │ length, pitch,     │
+                  │                     │ window, pan        │
                   │                     ▼                    │
                   │              ┌─────────────────┐         │
                   │        ┌────►│  DelayBuffer    │────┐    │
@@ -83,6 +83,9 @@ exact compile flags. The `krain_Standalone` target is directly runnable.
                   │        │     └─────────────────┘    │    │
                   │        │                            ▼    │
                   │        │                        Σ grains │
+                  │        │                            │    │
+                  │        │                            ▼    │
+                  │        │                        diffuser │
                   │        │                            │    │
                   │   softClip ◄── DC block ◄── lowpass ┘    │
                   │        ▲                            │    │
@@ -104,6 +107,9 @@ cmake --build build --target krain-render
 ./build/tools/krain-render --source clicks    # writes six preset renders
 tools/compare/serve.sh                             # indexes them and opens the app
 ```
+
+Presets: `default`, `shimmer` (ascending halo), `cathedral` (dissolves into air),
+`glass` (bright sparkle), `undertow` (reversed, dark, unstable), `freeze`.
 
 `krain-render --list` shows the built-in test signals (impulse, click train,
 detuned chord, noise burst, sine sweep) and the presets. `--input yourfile.wav`
@@ -209,7 +215,8 @@ initialised with:
 * a **pitch ratio** of `2^((pitch ± pitchSpray)/12)`, negated with probability
   `reverseProbability` so the grain plays backwards;
 * a **gain** of `1/√overlap`, so loudness stays roughly constant as density and
-  grain size change.
+  grain size change;
+* a **pan position** and a **left/right read offset**, both scaled by `width`.
 
 Each sample, every active grain reads the buffer at its fractional position (linear
 interpolation), scaled by a **Tukey window** — a flat top with Hann-shaped tapers,
@@ -217,10 +224,32 @@ looked up from a table built in `prepare()`. `alpha = 1` gives a plain Hann wind
 lower values give a flatter, more sustained grain. The window is what keeps grains
 from clicking at their edges.
 
-The summed grains go through the **feedback path** — a one-pole lowpass at
-`filterCutoff`, a fixed 25 Hz DC blocker, then a `tanh` soft clip — and are written
-back into the buffer. The soft clip is what makes feedback values up to and beyond
-1.0 saturate into a stable, musical limit instead of running away.
+**Intervals** decide where a grain's transposition comes from. `Free` uses the pitch
+knob and spray directly; the musical sets draw from a small pool — `Shimmer` is
+`{unison, unison, +12, +19}`. Unison appears twice in every set on purpose, and that
+is the whole trick: a shimmer is a pitched halo *over* the original, not the original
+transposed. If every grain rises, the sound climbs out of the spectrum and evaporates
+after a few feedback passes.
+
+**Width** does two things at once, because panning alone is not enough. Each grain
+gets a fixed constant-power pan position — but with several grains overlapping, random
+pan positions average out and both channels converge on the same signal. So each grain
+*also* reads its two channels at points up to 26 ms apart (under the Haas limit, so it
+reads as width rather than as a second echo). That makes left and right genuinely
+different audio. Measured on the same piano phrase, L/R correlation drops from 0.35 to
+below 0.05.
+
+The wet signal then passes through the **diffuser**: four Schroeder allpasses in series
+per channel, with mutually prime lengths that differ between left and right. An allpass
+passes every frequency at equal level but smears it in time, so repeats dissolve into a
+wash instead of staying discrete echoes. It sits in the output path, not only in the
+feedback loop — you hear it directly, and because the diffused signal is also what gets
+re-injected, each repeat smears a little further than the last.
+
+Finally the **feedback path** — a one-pole lowpass at `filterCutoff`, a fixed 25 Hz DC
+blocker, then a `tanh` soft clip — writes back into the buffer. The soft clip is what
+makes feedback values up to and beyond 1.0 saturate into a stable, musical limit
+instead of running away.
 
 **Freeze** simply stops the write head. The grains carry on scanning the last four
 seconds of captured audio for ever.
@@ -259,11 +288,15 @@ test asserts that `prepare()` *does* allocate, so the check cannot pass by accid
 | Density | 0.5 – 100 /s | How often grains are fired. |
 | Jitter | 0 – 1 | Randomises the trigger interval; 0 is a metronome. |
 | Pitch | ±24 st | Playback ratio of every grain. |
+| Intervals | Free … Shimmer | Musical set each grain draws its transposition from. |
 | Pitch Spray | 0 – 12 st | Random detune per grain. |
+| Drift | 0 – 1 | Slow wander of the read point — the cloud breathes. |
 | Position Spray | 0 – 500 ms | Random start-point offset per grain. |
 | Reverse | 0 – 1 | Probability that a grain plays backwards. |
 | Feedback | 0 – 1.2 | Soft-clipped, so > 1 saturates rather than blows up. |
 | Filter | 20 Hz – 20 kHz | One-pole lowpass inside the feedback loop. |
+| Width | 0 – 1 | Scatters grains across the stereo field. |
+| Diffusion | 0 – 1 | Allpass wash — turns discrete repeats into texture. |
 | Dry/Wet | 0 – 1 | |
 | Freeze | on/off | Stops writing; grains loop the captured audio. |
 

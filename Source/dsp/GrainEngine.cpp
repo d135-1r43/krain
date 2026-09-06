@@ -10,6 +10,15 @@ namespace
 constexpr double smoothingSeconds = 0.05;
 constexpr float dcBlockerCutoffHz = 25.0f;
 constexpr int minGrainSamples = 16;
+
+// How far the drift oscillators may pull the grain start point, at drift = 1.
+constexpr double maxDriftMs = 55.0;
+
+// How far apart a grain's two read points may sit. Kept under the Haas limit so it
+// reads as width rather than as a separate echo.
+constexpr double maxChannelOffsetMs = 26.0;
+constexpr double driftRateA = 0.071; // Hz
+constexpr double driftRateB = 0.113; // Hz
 } // namespace
 
 GrainEngine::GrainEngine()
@@ -37,6 +46,12 @@ void GrainEngine::prepare (double newSampleRate, int numChannels)
         hannTable[i] = (float) (0.5 - 0.5 * std::cos (juce::MathConstants<double>::twoPi * phase));
     }
 
+    // The two channels get slightly different allpass lengths. That single
+    // asymmetry is what makes the diffused tail wide, rather than a mono wash
+    // duplicated to both sides.
+    diffusers[0].prepare (sampleRate, 1.0);
+    diffusers[1].prepare (sampleRate, 1.17);
+
     dcBlockerCoeff = OnePoleFilter::coefficientFor (dcBlockerCutoffHz, sampleRate);
 
     for (auto& value : { &smoothedDelaySamples, &smoothedFeedback, &smoothedDryWet, &smoothedLowpassCoeff })
@@ -57,6 +72,13 @@ void GrainEngine::reset() noexcept
 
     for (auto& filter : feedbackDcBlocker)
         filter.reset();
+
+    for (auto& diffuser : diffusers)
+        diffuser.reset();
+
+    driftPhaseA = 0.0;
+    driftPhaseB = 1.7;
+    driftValue = 0.0f;
 
     currentDelaySamples = (float) (parameters.delayTimeMs * 0.001 * sampleRate);
 
@@ -126,6 +148,51 @@ float GrainEngine::nextBipolarRandom() noexcept
     return random.nextFloat() * 2.0f - 1.0f;
 }
 
+float GrainEngine::nextInterval() noexcept
+{
+    // Unison appears twice in every set on purpose: roughly half the grains stay
+    // put and hold the body of the sound while the rest form the halo above it.
+    switch (parameters.intervals)
+    {
+        case IntervalSet::octaveUp:
+        {
+            static constexpr float set[] { 0.0f, 0.0f, 12.0f };
+            return set[random.nextInt (3)];
+        }
+        case IntervalSet::fifthOctave:
+        {
+            static constexpr float set[] { 0.0f, 0.0f, 7.0f, 12.0f };
+            return set[random.nextInt (4)];
+        }
+        case IntervalSet::shimmer:
+        {
+            static constexpr float set[] { 0.0f, 0.0f, 12.0f, 19.0f };
+            return set[random.nextInt (4)];
+        }
+        case IntervalSet::octaveDown:
+        {
+            static constexpr float set[] { 0.0f, 0.0f, -12.0f };
+            return set[random.nextInt (3)];
+        }
+        case IntervalSet::free:
+        default:
+            return 0.0f;
+    }
+}
+
+void GrainEngine::advanceDrift (int numSamples) noexcept
+{
+    const auto step = (double) numSamples / sampleRate;
+
+    driftPhaseA += juce::MathConstants<double>::twoPi * driftRateA * step;
+    driftPhaseB += juce::MathConstants<double>::twoPi * driftRateB * step;
+
+    if (driftPhaseA > juce::MathConstants<double>::twoPi) driftPhaseA -= juce::MathConstants<double>::twoPi;
+    if (driftPhaseB > juce::MathConstants<double>::twoPi) driftPhaseB -= juce::MathConstants<double>::twoPi;
+
+    driftValue = (float) (0.6 * std::sin (driftPhaseA) + 0.4 * std::sin (driftPhaseB));
+}
+
 //==============================================================================
 void GrainEngine::scheduleNextGrain() noexcept
 {
@@ -161,6 +228,7 @@ void GrainEngine::triggerGrain() noexcept
         return;
 
     const auto semitones = parameters.pitchSemitones
+                           + nextInterval()
                            + nextBipolarRandom() * juce::jmax (0.0f, parameters.pitchSpraySemitones);
     const auto ratio = std::pow (2.0, (double) juce::jlimit (-36.0f, 36.0f, semitones) / 12.0);
 
@@ -175,7 +243,8 @@ void GrainEngine::triggerGrain() noexcept
         length = juce::jmax (minGrainSamples, (int) ((bufferSize - 8.0) / ratio));
 
     const auto sprayMs = nextBipolarRandom() * juce::jmax (0.0f, parameters.positionSprayMs);
-    auto offsetSamples = (double) currentDelaySamples + (double) sprayMs * 0.001 * sampleRate;
+    const auto driftMs = (double) driftValue * (double) juce::jlimit (0.0f, 1.0f, parameters.drift) * maxDriftMs;
+    auto offsetSamples = (double) currentDelaySamples + ((double) sprayMs + driftMs) * 0.001 * sampleRate;
     offsetSamples = juce::jlimit (1.0, bufferSize - (double) length * ratio - 4.0, offsetSamples);
 
     const auto start = delay.wrap ((double) delay.getWritePosition() - offsetSamples);
@@ -191,6 +260,21 @@ void GrainEngine::triggerGrain() noexcept
     // `overlap` is how many grains are sounding on average at any moment.
     const auto overlap = juce::jmax (1.0, (double) parameters.densityHz * (double) grainMs * 0.001);
     slot->gain = (float) (1.0 / std::sqrt (overlap));
+
+    // Constant-power pan, drawn once and then fixed: a grain that moved while it
+    // played would smear rather than occupy a place. At width 0 both weights are
+    // 1/sqrt(2) and the grain sits dead centre.
+    const auto width = juce::jlimit (0.0f, 1.0f, parameters.stereoWidth);
+    const auto panPosition = nextBipolarRandom() * width;
+    const auto angle = (panPosition * 0.5f + 0.5f) * juce::MathConstants<float>::halfPi;
+    slot->panLeft = std::cos (angle);
+    slot->panRight = std::sin (angle);
+
+    // Panning alone is not enough: with several grains overlapping, random pan
+    // positions average out and both channels converge on the same signal. Giving
+    // the two channels different read points makes them genuinely different audio,
+    // which is what actually widens the cloud.
+    slot->channelOffset = (double) nextBipolarRandom() * (double) width * maxChannelOffsetMs * 0.001 * sampleRate;
 }
 
 //==============================================================================
@@ -210,6 +294,13 @@ void GrainEngine::process (juce::AudioBuffer<float>& buffer) noexcept
     smoothedLowpassCoeff.setTargetValue (OnePoleFilter::coefficientFor (parameters.filterCutoffHz, sampleRate));
 
     const auto frozen = parameters.freeze;
+    const auto diffusionAmount = juce::jlimit (0.0f, 1.0f, parameters.diffusion);
+
+    // sqrt(2): at width 0 both pan weights are 1/sqrt(2), and multiplying them back
+    // up keeps a centred grain at exactly the level it had before panning existed.
+    constexpr auto panNormalisation = juce::MathConstants<float>::sqrt2;
+
+    advanceDrift (numSamples);
 
     for (int n = 0; n < numSamples; ++n)
     {
@@ -239,8 +330,20 @@ void GrainEngine::process (juce::AudioBuffer<float>& buffer) noexcept
             const auto envelope = windowValue ((double) grain.age / (double) grain.length) * grain.gain;
             const auto readPoint = delay.makeReadPoint (grain.readPosition);
 
-            for (int ch = 0; ch < numChannels; ++ch)
-                wet[ch] += delay.read (ch, readPoint) * envelope;
+            // Each channel reads at its own point, so the two sides carry different
+            // audio rather than the same signal at two levels. At width 0 the offset
+            // and the pan both collapse and this is exactly a plain per-channel read.
+            const auto scale = envelope * panNormalisation;
+
+            wet[0] += delay.read (0, readPoint) * scale * grain.panLeft;
+
+            if (numChannels > 1)
+            {
+                const auto rightPoint = grain.channelOffset != 0.0
+                                          ? delay.makeReadPoint (grain.readPosition + grain.channelOffset)
+                                          : readPoint;
+                wet[1] += delay.read (1, rightPoint) * scale * grain.panRight;
+            }
 
             grain.readPosition = delay.wrap (grain.readPosition + grain.increment);
 
@@ -249,6 +352,13 @@ void GrainEngine::process (juce::AudioBuffer<float>& buffer) noexcept
         }
 
         // -- feedback path and output ----------------------------------------
+        // Diffusion runs on the wet signal itself, so it is part of what you hear -
+        // not only of what gets re-injected. Because the diffused signal is also
+        // what feeds back, each repeat smears a little further than the last. The
+        // two channels use different allpass lengths, so the wash is wide.
+        for (int ch = 0; ch < numChannels; ++ch)
+            wet[ch] = diffusers[(size_t) ch].process (wet[ch], diffusionAmount);
+
         for (int ch = 0; ch < numChannels; ++ch)
         {
             auto* channelData = buffer.getWritePointer (ch);
