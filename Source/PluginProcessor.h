@@ -54,6 +54,9 @@ public:
     /** The editor attaches its sliders to this. */
     juce::AudioProcessorValueTreeState& getValueTreeState() noexcept { return apvts; }
 
+    /** Grain births for the editor's cloud view. */
+    krain::GrainEventQueue& getGrainEventQueue() noexcept { return engine.getEventQueue(); }
+
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
 private:

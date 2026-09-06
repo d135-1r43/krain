@@ -1,17 +1,20 @@
 #include "PluginEditor.h"
 
 #include "ParameterIds.h"
+#include "gui/KrainLookAndFeel.h"
 
 namespace
 {
-constexpr int headerHeight = 40;
-constexpr int margin = 10;
+constexpr int headerHeight = 46;
+constexpr int cloudHeight = 196;
+constexpr int margin = 14;
 } // namespace
 
 //==============================================================================
 KrainAudioProcessorEditor::KrainAudioProcessorEditor (KrainAudioProcessor& p)
     : AudioProcessorEditor (&p),
       processorRef (p),
+      cloud (p.getGrainEventQueue()),
       delayTime (p.getValueTreeState(), krain::params::delayTime, "Time"),
       syncEnabled (p.getValueTreeState(), krain::params::syncEnabled, "Sync"),
       syncDivision (p.getValueTreeState(), krain::params::syncDivision, "Division"),
@@ -31,6 +34,9 @@ KrainAudioProcessorEditor::KrainAudioProcessorEditor (KrainAudioProcessor& p)
       dryWet (p.getValueTreeState(), krain::params::dryWet, "Dry/Wet"),
       freeze (p.getValueTreeState(), krain::params::freeze, "Freeze")
 {
+    setLookAndFeel (&lookAndFeel);
+    addAndMakeVisible (cloud);
+
     for (auto* group : { &delayGroup, &grainGroup, &pitchGroup, &spaceGroup })
         addAndMakeVisible (*group);
 
@@ -57,34 +63,64 @@ KrainAudioProcessorEditor::KrainAudioProcessorEditor (KrainAudioProcessor& p)
     spaceGroup.addControl (freeze);
 
     setResizable (true, true);
-    setResizeLimits (760, 440, 1520, 880);
-    setSize (900, 480);
+    setResizeLimits (820, 560, 1640, 1120);
+    setSize (940, 640);
 }
 
-KrainAudioProcessorEditor::~KrainAudioProcessorEditor() = default;
+KrainAudioProcessorEditor::~KrainAudioProcessorEditor()
+{
+    // Detach before the LookAndFeel member is destroyed, or the children would be
+    // left pointing at freed memory during their own teardown.
+    setLookAndFeel (nullptr);
+}
 
 //==============================================================================
 void KrainAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+    using namespace krain::gui;
 
-    g.setColour (getLookAndFeel().findColour (juce::Label::textColourId));
-    g.setFont (juce::FontOptions (22.0f, juce::Font::bold));
-    g.drawText (processorRef.getName(),
-                getLocalBounds().removeFromTop (headerHeight).reduced (margin + 6, 0),
+    g.fillAll (palette::ink);
+
+    auto header = getLocalBounds().removeFromTop (headerHeight).reduced (margin, 0);
+
+    // Wordmark, tracked out by hand. JUCE has no letter-spacing, and the spacing is
+    // the point: it turns five letters into a mark rather than a word.
+    const auto markFont = font (Face::display, 25.0f);
+    g.setColour (palette::bone);
+
+    auto x = (float) header.getX();
+    const auto baseline = (float) header.getCentreY() + 8.0f;
+
+    g.setFont (markFont);
+
+    for (const auto character : processorRef.getName())
+    {
+        const juce::String glyph (juce::String::charToString (character));
+        g.drawSingleLineText (glyph, juce::roundToInt (x), juce::roundToInt (baseline));
+        x += juce::GlyphArrangement::getStringWidth (markFont, glyph) + 3.4f;
+    }
+
+    g.setColour (palette::boneDim);
+    g.setFont (font (Face::caption, 12.0f));
+    g.drawText ("granular delay", header.withTrimmedLeft (juce::roundToInt (x - (float) header.getX()) + 14),
                 juce::Justification::centredLeft);
 
-    g.setFont (juce::FontOptions (13.0f));
-    g.setColour (getLookAndFeel().findColour (juce::Label::textColourId).withAlpha (0.6f));
-    g.drawText ("granular delay",
-                getLocalBounds().removeFromTop (headerHeight).reduced (margin + 6, 0),
+    g.setColour (palette::halo.withAlpha (0.75f));
+    g.setFont (font (Face::value, 10.0f));
+    g.drawText (juce::String (cloud.getNumVisibleGrains()) + " grains", header,
                 juce::Justification::centredRight);
+
+    g.setColour (palette::line);
+    g.fillRect (margin, headerHeight - 1, getWidth() - margin * 2, 1);
 }
 
 void KrainAudioProcessorEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (margin);
     bounds.removeFromTop (headerHeight);
+
+    cloud.setBounds (bounds.removeFromTop (cloudHeight));
+    bounds.removeFromTop (margin);
 
     auto topRow = bounds.removeFromTop (bounds.getHeight() / 2);
     bounds.removeFromTop (margin);

@@ -275,6 +275,10 @@ void GrainEngine::triggerGrain() noexcept
     // the two channels different read points makes them genuinely different audio,
     // which is what actually widens the cloud.
     slot->channelOffset = (double) nextBipolarRandom() * (double) width * maxChannelOffsetMs * 0.001 * sampleRate;
+
+    // Hand the editor everything it needs to draw this grain. Non-blocking: if the
+    // queue is full the event is dropped rather than the audio thread stalling.
+    eventQueue.push ({ panPosition, (float) semitones, (float) length * 1000.0f / (float) sampleRate, playReversed });
 }
 
 //==============================================================================

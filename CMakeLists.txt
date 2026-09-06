@@ -91,7 +91,9 @@ juce_add_plugin(krain
 target_sources(krain PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
-    Source/gui/ParameterComponents.cpp)
+    Source/gui/ParameterComponents.cpp
+    Source/gui/KrainLookAndFeel.cpp
+    Source/gui/GrainCloudView.cpp)
 
 target_compile_definitions(krain PUBLIC
     JUCE_WEB_BROWSER=0

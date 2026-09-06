@@ -4,6 +4,7 @@
 
 #include "dsp/DelayBuffer.h"
 #include "dsp/Diffuser.h"
+#include "dsp/GrainEventQueue.h"
 #include "dsp/OnePoleFilter.h"
 
 #include <array>
@@ -107,6 +108,10 @@ public:
     int getNumActiveGrains() const noexcept;
     const DelayBuffer& getDelayBuffer() const noexcept { return delay; }
 
+    /** Grain births, for the editor to draw. Written from the audio thread and
+        read from the message thread without a lock. */
+    GrainEventQueue& getEventQueue() noexcept { return eventQueue; }
+
 private:
     void triggerGrain() noexcept;
     void scheduleNextGrain() noexcept;
@@ -152,6 +157,8 @@ private:
     double driftPhaseA = 0.0;
     double driftPhaseB = 1.7;
     float driftValue = 0.0f;
+
+    GrainEventQueue eventQueue;
 
     juce::Random random;
 

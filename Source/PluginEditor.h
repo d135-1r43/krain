@@ -3,6 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "PluginProcessor.h"
+#include "gui/GrainCloudView.h"
+#include "gui/KrainLookAndFeel.h"
 #include "gui/ParameterComponents.h"
 
 //==============================================================================
@@ -24,8 +26,18 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    /** Drives the cloud animation by hand. The timer does this in normal use;
+        offline renders and tests need to step it themselves. */
+    void advanceCloud (double deltaSeconds) { cloud.advance (deltaSeconds); }
+
 private:
     KrainAudioProcessor& processorRef;
+
+    // Declared before every control: a LookAndFeel must outlive the components that
+    // point at it, and members are destroyed in reverse order.
+    krain::gui::KrainLookAndFeel lookAndFeel;
+
+    krain::gui::GrainCloudView cloud;
 
     // Declaration order matters: the controls hold attachments into the APVTS and
     // must be gone before the groups that merely point at them. Groups are declared
